@@ -34,6 +34,43 @@ const paymentOptions = [
   { value: 'cash', label: 'Dinheiro', icon: Banknote },
 ] as const;
 
+/**
+ * Separador em ASCII puro. A versão anterior usava U+2501 (traço pesado de
+ * desenho de caixa), que não existe em muitas fontes de sistema e chegava à
+ * cozinha como uma fileira de "?" — eram 72 desses por comanda.
+ */
+const SEPARADOR = '--------------------';
+
+/**
+ * Última barreira antes de a comanda sair do aplicativo.
+ *
+ * A mensagem é texto simples lido em telefones e desktops variados, muitos com
+ * fontes incompletas. Aqui caem os caracteres que parecem inofensivos no
+ * editor mas chegam corrompidos do outro lado:
+ *
+ * - U+00A0 e U+202F: espaços inseparáveis que o Intl insere nos preços;
+ * - U+FE0F: seletor de variação que acompanha alguns emoji e vira quadrado
+ *   sozinho quando a fonte não tem o desenho colorido;
+ * - U+200B, U+200E, U+200F e U+FEFF: marcas invisíveis de direção e quebra
+ *   que podem entrar por colagem no nome ou no endereço.
+ */
+const limparParaWhatsApp = (texto: string) =>
+  texto
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .replace(/[\uFE0F\u200B\u200E\u200F\uFEFF]/g, '')
+    .replace(/[ \t]+\n/g, '\n');
+
+/**
+ * Formato documentado pelo Google (Maps URLs, api=1). A forma antiga
+ * (maps?q=lat,lng) é legada e depende de redirecionamento, o que atrapalha a
+ * abertura no aplicativo nativo do celular.
+ *
+ * Seis casas decimais equivalem a cerca de 11 cm — mais que suficiente para
+ * uma entrega, e evita arrastar o ruído do ponto flutuante para a URL.
+ */
+const mapsUrl = ({ lat, lng }: { lat: number; lng: number }) =>
+  `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`;
+
 export const CheckoutFlow = ({ items, onBack, onComplete }: CheckoutFlowProps) => {
   const [step, setStep] = useState<Step>('delivery-type');
   const [customerData, setCustomerData] = useState<CustomerData>({
@@ -79,7 +116,18 @@ export const CheckoutFlow = ({ items, onBack, onComplete }: CheckoutFlowProps) =
 
   const getLocation = () => {
     if (!('geolocation' in navigator)) {
-      toast.error('Geolocalização não suportada neste navegador');
+      toast.error('Geolocalização não é suportada neste navegador');
+      return;
+    }
+
+    // A API existe no objeto navigator mesmo em origem insegura, mas sempre
+    // falha por lá. Sem esta checagem, abrir o app pelo IP da rede local
+    // (http://192.168.x.x) resulta em "permissão negada" sem explicação.
+    if (!window.isSecureContext) {
+      toast.error('Localização exige HTTPS', {
+        description:
+          'Abra o site por um endereço https:// para usar o mapa. Você pode seguir informando o endereço por escrito.',
+      });
       return;
     }
 
@@ -94,11 +142,26 @@ export const CheckoutFlow = ({ items, onBack, onComplete }: CheckoutFlowProps) =
         toast.success('Localização capturada com sucesso!');
         setIsLocating(false);
       },
-      () => {
-        toast.error('Não foi possível obter sua localização');
+      (error) => {
+        // O motivo da falha muda completamente o que o usuário deve fazer,
+        // então cada código recebe sua própria orientação.
+        const mensagens: Record<number, string> = {
+          [error.PERMISSION_DENIED]:
+            'Permissão negada. Autorize o acesso à localização nas configurações do navegador.',
+          [error.POSITION_UNAVAILABLE]:
+            'Não foi possível determinar sua posição. Verifique se o GPS está ligado.',
+          [error.TIMEOUT]:
+            'A busca demorou demais. Tente de novo, de preferência perto de uma janela.',
+        };
+
+        toast.error('Não foi possível obter sua localização', {
+          description: mensagens[error.code] ?? 'Informe o endereço por escrito.',
+        });
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      // 10s com alta precisão costuma estourar em ambiente fechado; aceitar
+      // uma leitura recente do cache resolve a maioria das segundas tentativas.
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 },
     );
   };
 
@@ -108,42 +171,42 @@ export const CheckoutFlow = ({ items, onBack, onComplete }: CheckoutFlowProps) =
         (item) =>
           `• ${item.quantity}x ${item.product.name} - ${formatPrice(
             item.product.price * item.quantity,
-          )}${item.notes ? `\n   📝 Obs: ${item.notes}` : ''}`,
+          )}${item.notes ? `\n   Obs: ${item.notes}` : ''}`,
       )
       .join('\n');
 
     const paymentLabels = {
-      pix: '💠 PIX',
-      card: '💳 Cartão (Crédito/Débito)',
-      cash: '💵 Dinheiro',
+      pix: 'PIX',
+      card: 'Cartão (Crédito/Débito)',
+      cash: 'Dinheiro',
     };
 
-    let message = `🍔 *NOVO PEDIDO* 🍔\n\n`;
-    message += `👤 *Cliente:* ${customerData.name}\n`;
-    message += `📋 *Tipo:* ${isDelivery ? '🚚 ENTREGA' : '🏪 RETIRADA'}\n\n`;
-    message += `━━━━━━━━━━━━━━━━━━\n`;
-    message += `📦 *ITENS DO PEDIDO:*\n\n`;
+    let message = `*NOVO PEDIDO*\n\n`;
+    message += `*Cliente:* ${customerData.name}\n`;
+    message += `*Tipo:* ${isDelivery ? 'ENTREGA' : 'RETIRADA'}\n\n`;
+    message += `${SEPARADOR}\n`;
+    message += `*ITENS DO PEDIDO:*\n\n`;
     message += `${itemsList}\n\n`;
-    message += `━━━━━━━━━━━━━━━━━━\n`;
-    message += `💰 *TOTAL: ${formatPrice(total)}*\n`;
-    message += `💳 *Pagamento:* ${paymentLabels[customerData.paymentMethod]}\n`;
+    message += `${SEPARADOR}\n`;
+    message += `*TOTAL: ${formatPrice(total)}*\n`;
+    message += `*Pagamento:* ${paymentLabels[customerData.paymentMethod]}\n`;
 
     if (isDelivery) {
-      message += `\n━━━━━━━━━━━━━━━━━━\n`;
-      message += `📍 *ENDEREÇO DE ENTREGA:*\n`;
+      message += `\n${SEPARADOR}\n`;
+      message += `*ENDEREÇO DE ENTREGA:*\n`;
       message += `${customerData.address}\n`;
       if (customerData.complement) {
-        message += `📌 Complemento: ${customerData.complement}\n`;
+        message += `Complemento: ${customerData.complement}\n`;
       }
       if (customerData.location) {
-        message += `\n🗺️ *Localização no Maps:*\nhttps://www.google.com/maps?q=${customerData.location.lat},${customerData.location.lng}\n`;
+        message += `\n*Localização no Maps:*\n${mapsUrl(customerData.location)}\n`;
       }
     }
 
-    message += `\n━━━━━━━━━━━━━━━━━━\n`;
-    message += `✅ Aguardando confirmação do pedido!`;
+    message += `\n${SEPARADOR}\n`;
+    message += `Aguardando confirmação do pedido!`;
 
-    return encodeURIComponent(message);
+    return encodeURIComponent(limparParaWhatsApp(message));
   };
 
   const handleSubmit = () => {
