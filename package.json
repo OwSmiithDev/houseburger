@@ -1,7 +1,8 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "house-burger",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Cardapio digital mobile-first: o cliente monta o pedido no celular e envia direto pelo WhatsApp.",
   "type": "module",
   "scripts": {
     "dev": "vite",
