@@ -7,11 +7,12 @@ import { Cart } from '@/components/Cart';
 import { FloatingCartButton } from '@/components/FloatingCartButton';
 import { CheckoutFlow } from '@/components/CheckoutFlow';
 import { products } from '@/data/products';
+import { usePersistentCart } from '@/hooks/use-persistent-cart';
 import { Category, CartItem, Product } from '@/types/order';
 
 const Index = () => {
   const [activeCategory, setActiveCategory] = useState<Category>('promos');
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const { cartItems, setCartItems, clearCart } = usePersistentCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
@@ -53,7 +54,7 @@ const Index = () => {
     });
     // Sem toast a cada toque: o card já mostra o selo de quantidade e o botão
     // flutuante atualiza o total. Notificação repetida vira ruído no celular.
-  }, []);
+  }, [setCartItems]);
 
   const removeOneFromCart = useCallback((product: Product) => {
     setCartItems((prev) =>
@@ -62,7 +63,7 @@ const Index = () => {
         return item.quantity > 1 ? { ...item, quantity: item.quantity - 1 } : [];
       }),
     );
-  }, []);
+  }, [setCartItems]);
 
   const updateQuantity = useCallback((id: string, quantity: number) => {
     if (quantity <= 0) {
@@ -72,13 +73,13 @@ const Index = () => {
     setCartItems((prev) =>
       prev.map((item) => (item.product.id === id ? { ...item, quantity } : item)),
     );
-  }, []);
+  }, [setCartItems]);
 
   const updateNotes = useCallback((id: string, notes: string) => {
     setCartItems((prev) =>
       prev.map((item) => (item.product.id === id ? { ...item, notes } : item)),
     );
-  }, []);
+  }, [setCartItems]);
 
   const removeItem = useCallback((id: string) => {
     setCartItems((prev) => {
@@ -99,7 +100,7 @@ const Index = () => {
 
       return next;
     });
-  }, []);
+  }, [setCartItems]);
 
   const handleCategoryChange = useCallback((category: Category) => {
     setActiveCategory(category);
@@ -110,9 +111,9 @@ const Index = () => {
 
   const handleCheckoutComplete = useCallback(() => {
     setIsCheckoutOpen(false);
-    setCartItems([]);
+    clearCart();
     toast.success('Pedido enviado com sucesso!');
-  }, []);
+  }, [clearCart]);
 
   return (
     // data-vaul-drawer-wrapper habilita o recuo do fundo quando o carrinho
