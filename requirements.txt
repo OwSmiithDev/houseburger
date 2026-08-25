@@ -1,0 +1,16 @@
+# Dependências Python — usadas apenas para testes end-to-end do House Burger.
+#
+# O aplicativo em si não precisa de Python: as dependências de execução e de
+# build estão em package.json (Node 20.19+ ou 22.12+).
+#
+# Uso:
+#   python -m venv .venv
+#   .venv\Scripts\activate        # Windows
+#   source .venv/bin/activate     # Linux / macOS
+#   pip install -r requirements.txt
+#   playwright install chromium   # baixa o navegador, não vem via pip
+#
+# Depois, com o app servindo em http://localhost:8080 (`npm run dev`),
+# rode os scripts de teste apontando para essa URL.
+
+playwright==1.60.0
