@@ -21,6 +21,11 @@ design: vai embutida no JavaScript entregue ao navegador. O que a torna segura
 
 ---
 
+> **Este projeto já está provisionado.** Tabelas, regras de acesso, função de
+> pedido, catálogo inicial, bucket de imagens e usuário do dono já foram
+> criados. Os passos abaixo servem para recriar do zero ou montar um segundo
+> ambiente.
+
 ## 1. Criar o projeto
 
 1. Em [supabase.com](https://supabase.com), crie um projeto (o plano gratuito

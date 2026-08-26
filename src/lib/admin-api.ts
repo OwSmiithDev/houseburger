@@ -12,6 +12,28 @@ const naoDeuCerto = (erro: { message: string } | null) => {
   if (erro) throw new Error(erro.message);
 };
 
+/**
+ * Deixa passar só as colunas reais da tabela.
+ *
+ * As listagens trazem relações aninhadas (`products` vem com `categories`,
+ * `option_groups` vem com `option_items`) e mandar isso de volta num update faz
+ * o PostgREST recusar: "Could not find the 'categories' column".
+ */
+const apenas = <T extends object>(obj: T, colunas: readonly string[]) =>
+  Object.fromEntries(
+    Object.entries(obj).filter(([k]) => colunas.includes(k)),
+  ) as Partial<T>;
+
+const COLUNAS_PRODUTO = [
+  'slug', 'nome', 'descricao', 'preco', 'image_url',
+  'category_id', 'destaque', 'esgotado', 'ordem', 'ativo',
+] as const;
+
+const COLUNAS_GRUPO = ['slug', 'nome', 'min_opcoes', 'max_opcoes', 'ordem'] as const;
+const COLUNAS_OPCAO = ['group_id', 'slug', 'nome', 'price_delta', 'esgotado', 'ordem'] as const;
+const COLUNAS_CUPOM = ['codigo', 'descricao', 'tipo', 'valor', 'min_subtotal', 'ativo'] as const;
+const COLUNAS_CATEGORIA = ['slug', 'rotulo', 'icone', 'ordem', 'ativa'] as const;
+
 // ------------------------------------------------------------------ produtos
 export interface ProdutoAdmin {
   id?: string;
@@ -37,9 +59,9 @@ export const listarProdutos = async () => {
 };
 
 export const salvarProduto = async (p: ProdutoAdmin) => {
-  const { id, ...campos } = p;
-  const { error } = id
-    ? await supabase.from('products').update(campos).eq('id', id)
+  const campos = apenas(p, COLUNAS_PRODUTO);
+  const { error } = p.id
+    ? await supabase.from('products').update(campos).eq('id', p.id)
     : await supabase.from('products').insert(campos);
   naoDeuCerto(error);
 };
@@ -80,9 +102,9 @@ export const salvarGrupo = async (g: {
   max_opcoes: number;
   ordem: number;
 }) => {
-  const { id, ...campos } = g;
-  const { error } = id
-    ? await supabase.from('option_groups').update(campos).eq('id', id)
+  const campos = apenas(g, COLUNAS_GRUPO);
+  const { error } = g.id
+    ? await supabase.from('option_groups').update(campos).eq('id', g.id)
     : await supabase.from('option_groups').insert(campos);
   naoDeuCerto(error);
 };
@@ -101,9 +123,9 @@ export const salvarOpcao = async (o: {
   esgotado: boolean;
   ordem: number;
 }) => {
-  const { id, ...campos } = o;
-  const { error } = id
-    ? await supabase.from('option_items').update(campos).eq('id', id)
+  const campos = apenas(o, COLUNAS_OPCAO);
+  const { error } = o.id
+    ? await supabase.from('option_items').update(campos).eq('id', o.id)
     : await supabase.from('option_items').insert(campos);
   naoDeuCerto(error);
 };
@@ -153,9 +175,9 @@ export const salvarCategoria = async (c: {
   ordem: number;
   ativa: boolean;
 }) => {
-  const { id, ...campos } = c;
-  const { error } = id
-    ? await supabase.from('categories').update(campos).eq('id', id)
+  const campos = apenas(c, COLUNAS_CATEGORIA);
+  const { error } = c.id
+    ? await supabase.from('categories').update(campos).eq('id', c.id)
     : await supabase.from('categories').insert(campos);
   naoDeuCerto(error);
 };
@@ -176,9 +198,9 @@ export const salvarCupom = async (c: {
   min_subtotal: number;
   ativo: boolean;
 }) => {
-  const { id, ...campos } = c;
-  const { error } = id
-    ? await supabase.from('coupons').update(campos).eq('id', id)
+  const campos = apenas(c, COLUNAS_CUPOM);
+  const { error } = c.id
+    ? await supabase.from('coupons').update(campos).eq('id', c.id)
     : await supabase.from('coupons').insert(campos);
   naoDeuCerto(error);
 };
@@ -200,9 +222,11 @@ export const lerConfiguracao = async () => {
 };
 
 export const salvarConfiguracao = async (campos: Record<string, unknown>) => {
+  const { id, ...resto } = campos;
+  void id; // a linha é sempre a de id 1
   const { error } = await supabase
     .from('store_settings')
-    .update({ ...campos, atualizado_em: new Date().toISOString() })
+    .update({ ...resto, atualizado_em: new Date().toISOString() })
     .eq('id', 1);
   naoDeuCerto(error);
 };
