@@ -1,5 +1,5 @@
 /* @import precisa vir antes de qualquer outra regra — inclusive das diretivas do Tailwind.
-   Estava depois de @tailwind, o que fazia o PostCSS descartar a fonte silenciosamente. */
+   Depois delas o PostCSS descarta a fonte silenciosamente. */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
 
 @tailwind base;
@@ -8,48 +8,55 @@
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 98%;
+    /* Tema claro. O fundo é cinza para que os cards brancos se destaquem sem
+       precisar de borda — o mesmo recurso das referências. */
+    --background: 240 6% 96%;
+    --foreground: 240 6% 10%;
 
-    --card: 0 0% 11%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
 
-    --popover: 0 0% 11%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
 
-    --primary: 0 84% 50%;
+    /* Vermelho do House Burger. 47% de luminosidade dá 4,9:1 com texto branco,
+       acima do mínimo AA; o 50% anterior ficava em 4,4:1. */
+    --primary: 0 75% 47%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 96% 53%;
-    --secondary-foreground: 0 0% 7%;
+    /* Âmbar, reservado a selos de oferta e destaque — nunca a texto pequeno,
+       porque sobre branco não alcança contraste de leitura. */
+    --secondary: 38 92% 50%;
+    --secondary-foreground: 240 6% 10%;
 
-    --muted: 0 0% 18%;
-    /* 0 0% 65% dava 4.1:1 sobre o fundo; 72% sobe para 5.2:1 (WCAG AA em texto pequeno) */
-    --muted-foreground: 0 0% 72%;
+    --muted: 240 5% 94%;
+    --muted-foreground: 240 4% 42%;
 
-    --accent: 40 96% 53%;
-    --accent-foreground: 0 0% 7%;
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 6% 10%;
 
-    --destructive: 0 62% 50%;
+    /* Com o vermelho virando cor de ação, o destrutivo precisa ser outro tom
+       para não competir. Usado só em texto de erro e estados de exclusão. */
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 40 96% 53%;
+    --border: 240 6% 90%;
+    --input: 240 6% 88%;
+    --ring: 0 75% 47%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;
 
-    /* Custom tokens */
-    --success: 142 60% 45%;
-    --success-foreground: 0 0% 7%;
+    /* Verde de economia: cupons, descontos e confirmações. */
+    --success: 142 71% 34%;
+    --success-foreground: 0 0% 100%;
 
-    --gradient-hero: linear-gradient(135deg, hsl(0 84% 50%) 0%, hsl(25 95% 50%) 50%, hsl(40 96% 53%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 13%) 0%, hsl(0 0% 9%) 100%);
-    --gradient-overlay: linear-gradient(180deg, transparent 0%, hsl(0 0% 0% / 0.8) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(0 75% 47%) 0%, hsl(14 88% 50%) 55%, hsl(32 94% 52%) 100%);
 
-    --shadow-glow: 0 0 30px hsl(0 84% 50% / 0.3);
-    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.4);
-    --shadow-button: 0 4px 16px hsl(0 84% 50% / 0.4);
+    /* Elevação discreta no lugar do brilho do tema escuro. */
+    --shadow-card: 0 1px 2px hsl(240 6% 10% / 0.06), 0 1px 3px hsl(240 6% 10% / 0.04);
+    --shadow-raised: 0 4px 12px hsl(240 6% 10% / 0.08);
+    --shadow-bar: 0 -1px 12px hsl(240 6% 10% / 0.08);
+    --shadow-button: 0 2px 8px hsl(0 75% 47% / 0.28);
 
     /* Áreas seguras (notch / barra de gestos). Com viewport-fit=cover no HTML,
        env() resolve para valores reais; em desktop cai no fallback 0px. */
@@ -61,14 +68,17 @@
     /* Altura mínima de alvo de toque (WCAG 2.5.5 / HIG) */
     --tap: 44px;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    /* Altura da barra fixa inferior, para o conteúdo reservar espaço. */
+    --bar: 4.5rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5% 26%;
+    --sidebar-primary: 240 6% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-ring: 0 75% 47%;
   }
 }
 
@@ -79,7 +89,6 @@
 
   html {
     scroll-behavior: smooth;
-    /* Impede o zoom automático do iOS ao focar inputs sem desabilitar o pinch-zoom */
     -webkit-text-size-adjust: 100%;
   }
 
@@ -89,11 +98,10 @@
     /* Remove o atraso de 300ms no toque e o flash azul do Chrome Android */
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    /* Evita o pull-to-refresh acidental ao arrastar a lista de produtos */
+    /* Evita o pull-to-refresh acidental ao arrastar as listas */
     overscroll-behavior-y: none;
   }
 
-  /* Alvos de toque herdam o mesmo comportamento */
   button,
   a,
   [role='button'],
@@ -108,10 +116,10 @@
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 6px;
   }
 
-  /* iOS dá zoom em qualquer input com fonte < 16px */
+  /* iOS dá zoom em qualquer campo com fonte < 16px */
   input,
   textarea,
   select {
@@ -124,27 +132,20 @@
     background: var(--gradient-hero);
   }
 
-  .gradient-card {
-    background: var(--gradient-card);
-  }
-
-  .shadow-glow {
-    box-shadow: var(--shadow-glow);
-  }
-
   .shadow-card {
     box-shadow: var(--shadow-card);
   }
 
-  .shadow-button {
-    box-shadow: var(--shadow-button);
+  .shadow-raised {
+    box-shadow: var(--shadow-raised);
   }
 
-  .text-gradient {
-    background: var(--gradient-hero);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .shadow-bar {
+    box-shadow: var(--shadow-bar);
+  }
+
+  .shadow-button {
+    box-shadow: var(--shadow-button);
   }
 
   /* Feedback de toque padrão: recuo sutil que NÃO desloca o layout ao redor.
@@ -155,8 +156,8 @@
   }
 
   .press:active {
-    transform: scale(0.96);
-    filter: brightness(1.1);
+    transform: scale(0.97);
+    filter: brightness(0.96);
   }
 
   .press-sm {
@@ -173,10 +174,14 @@
     min-width: var(--tap);
     min-height: var(--tap);
   }
+
+  /* Cartão branco padrão das telas */
+  .surface {
+    @apply rounded-2xl bg-card shadow-card;
+  }
 }
 
 @layer utilities {
-  /* Espaçamentos de área segura */
   .pt-safe {
     padding-top: var(--safe-top);
   }
@@ -194,13 +199,12 @@
     bottom: max(1rem, var(--safe-bottom));
   }
 
-  /* Reserva espaço para a barra de CTA fixa + área segura */
-  .pb-cta {
-    padding-bottom: calc(6.5rem + var(--safe-bottom));
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+  /* Reserva espaço para a barra fixa inferior.
+     --bar-h é medido em tempo de execução pelo próprio BottomBar e já inclui
+     a faixa de aviso e a área segura; o valor em --bar é só o piso usado
+     antes da primeira medição. */
+  .pb-bar {
+    padding-bottom: calc(var(--bar-h, calc(var(--bar) + var(--safe-bottom))) + 1rem);
   }
 
   .animate-slide-up {
@@ -219,17 +223,8 @@
     animation: pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .animate-shake {
-    animation: shake 0.4s ease-in-out;
-  }
-
-  @keyframes pulse-glow {
-    0%, 100% {
-      box-shadow: 0 0 20px hsl(0 84% 50% / 0.4);
-    }
-    50% {
-      box-shadow: 0 0 40px hsl(0 84% 50% / 0.6);
-    }
+  .animate-fade-in {
+    animation: fade-in 0.25s ease-out;
   }
 
   @keyframes slide-up {
@@ -272,10 +267,9 @@
     100% { transform: scale(1); }
   }
 
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-4px); }
-    75% { transform: translateX(4px); }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -287,10 +281,15 @@
     scrollbar-width: none;
   }
 
-  /* Carrossel de categorias: cada chip ancora no início do scroll */
+  /* Carrosséis: cada item ancora no início do scroll.
+     scroll-padding é necessário porque a âncora do snap é a borda do
+     snapport, que ignora o padding do container: sem isto o navegador rola
+     sozinho e o primeiro item cola na borda da tela. */
   .snap-x-mandatory {
     scroll-snap-type: x mandatory;
     overscroll-behavior-x: contain;
+    scroll-padding-left: 1rem;
+    scroll-padding-right: 1rem;
   }
 
   .snap-start-always {
@@ -300,7 +299,7 @@
 }
 
 /* Respeita a preferência de sistema por menos movimento.
-   Anima o essencial (opacidade) e elimina loops infinitos e transformações. */
+   Anima o essencial e elimina loops e transformações. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -318,6 +317,6 @@
   .press:active,
   .press-sm:active {
     transform: none;
-    filter: brightness(1.15);
+    filter: brightness(0.94);
   }
 }

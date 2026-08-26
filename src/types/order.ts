@@ -9,25 +9,66 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 
+/** Uma escolha dentro de um grupo. O acréscimo pode ser zero. */
+export interface OptionItem {
+  id: string;
+  name: string;
+  priceDelta: number;
+  soldOut?: boolean;
+}
+
+/**
+ * Grupo de personalização de um produto.
+ *
+ * `min` e `max` governam tanto a interface quanto a validação do carrinho
+ * restaurado: um grupo com min 1 e max 1 vira escolha única; min 0 e max 5,
+ * uma lista de adicionais.
+ */
+export interface OptionGroup {
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  options: OptionItem[];
+}
+
 export interface Product {
   id: string;
   name: string;
   description: string;
+  /** Preço base. Com grupos, é o "a partir de". */
   price: number;
   image: string;
-  category: string;
+  category: Category;
+  groups?: OptionGroup[];
+  /** Entra no carrossel de destaques da loja. */
+  featured?: boolean;
 }
 
-export interface CartItem {
-  product: Product;
+/**
+ * Uma linha do carrinho, não um produto.
+ *
+ * O mesmo hambúrguer com pães diferentes são pedidos diferentes, então a
+ * identidade da linha é própria e não o id do produto.
+ */
+export interface CartLine {
+  lineId: string;
+  productId: string;
   quantity: number;
   notes: string;
+  /** grupo -> opção -> quantidade */
+  selections: Record<string, Record<string, number>>;
 }
+
+export type DeliveryType = 'pickup' | 'delivery';
+export type PaymentMethod = 'pix' | 'card' | 'cash';
 
 export interface CustomerData {
   name: string;
-  deliveryType: 'pickup' | 'delivery';
-  paymentMethod: 'pix' | 'card' | 'cash';
+  deliveryType: DeliveryType;
+  paymentMethod: PaymentMethod;
+  /** Troco para quanto, só faz sentido em dinheiro. */
+  changeFor?: number;
   address?: string;
   complement?: string;
   location?: {
