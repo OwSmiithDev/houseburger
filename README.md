@@ -10,16 +10,25 @@ interface partem daí.
 
 Capturas do aplicativo em execução, em viewport de celular (390 × 844).
 
-| Cardápio | Item no carrinho | Carrinho | Checkout |
-|---|---|---|---|
-| ![Cardápio com as promoções do dia](docs/screenshots/01-cardapio.jpg) | ![Card do produto com o controle de quantidade](docs/screenshots/02-produto-no-carrinho.jpg) | ![Carrinho aberto como painel inferior](docs/screenshots/03-carrinho.jpg) | ![Formulário de dados do checkout](docs/screenshots/04-checkout.jpg) |
+| Cardápio | Personalização | Sacola |
+|---|---|---|
+| ![Loja com vitrine de destaques e categorias](docs/screenshots/01-cardapio.jpg) | ![Grupos de opções obrigatórias do produto](docs/screenshots/02-personalizacao.jpg) | ![Sacola com as escolhas listadas e cupom](docs/screenshots/03-sacola.jpg) |
 
-Da esquerda para a direita: a navegação por categorias com ancoragem de
-rolagem; o card depois do primeiro toque, com o botão de adicionar dando lugar
-ao controle de quantidade e o contador aparecendo na aba e no card; o carrinho
-como painel inferior arrastável, com o campo de observação aberto; e a segunda
-etapa do checkout, com validação por campo e a forma de pagamento marcada por
-ícone além da cor.
+| Checkout | Endereço |
+|---|---|
+| ![Resumo com taxas, gorjeta e total](docs/screenshots/04-checkout.jpg) | ![Mapa com marcador arrastável](docs/screenshots/05-mapa.jpg) |
+
+## Como funciona
+
+1. **Loja** — vitrine de mais pedidos, busca e navegação por categoria.
+2. **Produto** — grupos de personalização com mínimo e máximo. Enquanto houver
+   grupo obrigatório pendente o botão fica travado, com o motivo visível e
+   clicável, levando direto ao grupo que falta.
+3. **Sacola** — cada linha mostra o que foi escolhido, porque o mesmo produto
+   com opções diferentes são pedidos diferentes. Cupom e talheres aqui.
+4. **Checkout** — retirada ou entrega, dados, gorjeta e o resumo com as contas
+   abertas: subtotal, desconto, taxa de entrega, taxa de serviço e total.
+5. **WhatsApp** — a comanda sai formatada para a cozinha.
 
 ## Stack
 
@@ -28,7 +37,8 @@ etapa do checkout, com validação por campo e a forma de pagamento marcada por
 | Build | Vite 7 |
 | UI | React 18 + TypeScript |
 | Estilo | Tailwind CSS 3 + shadcn/ui |
-| Bottom sheet | vaul |
+| Rotas | React Router 7 |
+| Mapa | Leaflet + OpenStreetMap |
 | Ícones | lucide-react |
 | Notificações | sonner |
 
@@ -46,13 +56,12 @@ O servidor sobe em `http://localhost:8080` e também escuta na rede local — o
 endereço `Network:` que aparece no terminal permite abrir o app no celular,
 que é onde ele deve ser testado de verdade.
 
-> **A captura de localização não funciona pelo endereço da rede.** A API de
-> geolocalização do navegador só opera em contexto seguro: HTTPS ou
-> `localhost`. Abrindo por `http://192.168.x.x`, o botão "Usar minha
-> localização atual" avisa que é preciso HTTPS e o resto do pedido segue
-> normalmente. Para exercitar o mapa no celular, exponha o servidor por um
-> túnel HTTPS. Todo o restante da interface pode ser testado pela rede sem
-> ressalva.
+> **O GPS não funciona pelo endereço da rede.** A API de geolocalização só
+> opera em contexto seguro: HTTPS ou `localhost`. Abrindo por
+> `http://192.168.x.x`, o botão de localização avisa que é preciso HTTPS —
+> mas o mapa continua utilizável arrastando o marcador, que é o caminho
+> principal de qualquer forma. Todo o restante da interface pode ser testado
+> pela rede sem ressalva.
 
 | Script | O que faz |
 |---|---|
@@ -64,8 +73,8 @@ que é onde ele deve ser testado de verdade.
 
 ### Testes end-to-end
 
-Os testes de interface e de intrusão são escritos em Python com Playwright —
-por isso o `requirements.txt` na raiz. Eles são independentes do build:
+Os testes de interface, de intrusão e de auditoria da comanda são escritos em
+Python com Playwright — por isso o `requirements.txt` na raiz:
 
 ```sh
 python -m venv .venv
@@ -74,86 +83,101 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-Com o `npm run dev` no ar, os testes dirigem o app num viewport de celular e
-verificam alvos de toque, áreas seguras, o fluxo de pedido e a resistência do
-carrinho persistido a adulteração.
-
 ## Estrutura
 
 ```
 src/
+├── pages/                      uma rota por arquivo
+│   ├── Store.tsx               /              cardápio
+│   ├── Product.tsx             /produto/:id   personalização
+│   ├── Cart.tsx                /sacola
+│   ├── Checkout.tsx            /checkout
+│   ├── Payment.tsx             /pagamento
+│   └── Address.tsx             /endereco      mapa (carregado sob demanda)
 ├── components/
-│   ├── Header.tsx              cabeçalho + status da loja
-│   ├── CategoryTabs.tsx        navegação por categoria (scroll-snap)
-│   ├── ProductCard.tsx         card com stepper de quantidade embutido
-│   ├── Cart.tsx                carrinho como bottom sheet (vaul)
-│   ├── CartItem.tsx            item do carrinho + observação
-│   ├── FloatingCartButton.tsx  CTA fixo com total
-│   ├── CheckoutFlow.tsx        2 etapas → monta a mensagem do WhatsApp
-│   └── ui/                     componentes shadcn/ui (gerados)
-├── hooks/
-│   └── use-persistent-cart.ts  carrinho que sobrevive ao reload
+│   ├── base/                   BottomBar, AppBar, Stepper, primitives
+│   ├── store/                  StoreHero, CategoryChips, ProductRow, carrossel
+│   └── product/                OptionGroupField
+├── store/
+│   ├── cart.tsx                carrinho, único no app e persistido
+│   └── checkout.tsx            dados do pedido, só em memória
 ├── lib/
-│   ├── format.ts               formatação de preço em BRL
+│   ├── pricing.ts              todo o cálculo do pedido
+│   ├── whatsapp.ts             montagem e limpeza da comanda
+│   ├── format.ts               preço em BRL
 │   └── haptics.ts              feedback tátil
-├── data/products.ts            catálogo
-├── types/order.ts              tipos, rótulos e ícones de categoria
-└── pages/Index.tsx             tela principal
+├── data/
+│   ├── products.ts             catálogo e grupos de opções
+│   ├── config.ts               taxas, mínimo, dados da loja
+│   └── coupons.ts              cupons aceitos
+└── types/order.ts              tipos do domínio
 ```
+
+As rotas usam `React.lazy`. É o que mantém o Leaflet (~45 KB comprimidos) fora
+do carregamento inicial: só quem abre `/endereco` paga esse custo.
 
 ## Configuração
 
-Não há variáveis de ambiente. Os dois pontos que se ajustam no código:
+Não há variáveis de ambiente. O que se ajusta fica em três arquivos:
 
-- **Número do WhatsApp** — constante `WHATSAPP_NUMBER` em
-  `src/components/CheckoutFlow.tsx`, no formato internacional sem símbolos
-  (ex.: `5562999718912`).
-- **Cardápio** — `src/data/products.ts`. Cada produto precisa de `id` único,
-  `category` correspondente a uma das chaves de `Category` (`src/types/order.ts`)
-  e uma `image` acessível por URL.
+- **`src/data/config.ts`** — número do WhatsApp, taxa de entrega, taxa de
+  serviço, pedido mínimo, sugestões de gorjeta e dados exibidos da loja.
+  **Os valores atuais são exemplos** e precisam ser trocados pelos reais.
+- **`src/data/products.ts`** — catálogo e grupos de personalização. Cada
+  produto precisa de `id` único e `category` correspondente a uma chave de
+  `Category`. Os grupos definem `min` e `max`: `min: 1, max: 1` vira escolha
+  única obrigatória; `min: 0` vira lista de adicionais.
+- **`src/data/coupons.ts`** — cupons, com desconto percentual, fixo ou frete
+  grátis, e subtotal mínimo.
 
-Ao remover um produto do cardápio, carrinhos salvos que o referenciem
-simplesmente descartam aquele item — não é preciso migrar nada.
+Ao remover um produto ou uma opção do cardápio, sacolas salvas que os
+referenciem simplesmente descartam aquele trecho — não é preciso migrar nada.
 
 ### Editando a comanda do WhatsApp
 
-A mensagem montada em `generateWhatsAppMessage` é **texto simples**, lido na
-correria da cozinha em aparelhos variados e com fontes incompletas. Ela já
-chegou corrompida uma vez, com fileiras de `?` no lugar das linhas
-separadoras e um `?` dentro de cada preço. Ao mexer nela:
+A mensagem montada em `src/lib/whatsapp.ts` é **texto simples**, lido na correria
+da cozinha em aparelhos variados e com fontes incompletas. Ela já chegou
+corrompida uma vez, com fileiras de `?` no lugar dos separadores e um `?` dentro
+de cada preço. Ao mexer nela:
 
-- **Use apenas ASCII e acentos.** Os separadores são hifens por isso. A versão
-  anterior usava `━` (U+2501), o traço pesado de desenho de caixa, ausente em
-  muitas fontes de sistema — eram 72 por comanda.
-- **Evite emoji.** Dependem de fonte colorida instalada, e alguns arrastam
-  junto o seletor de variação U+FE0F, que vira um quadrado sozinho. O negrito
-  do próprio WhatsApp, com `*asteriscos*`, já dá hierarquia suficiente.
+- **Use apenas ASCII e acentos.** Os separadores são hifens por isso. Traços de
+  desenho de caixa como `━` (U+2501) faltam em muitas fontes de sistema.
+- **Evite emoji.** Dependem de fonte colorida instalada, e alguns arrastam junto
+  o seletor de variação U+FE0F, que vira um quadrado sozinho. O negrito do
+  próprio WhatsApp, com `*asteriscos*`, já dá hierarquia suficiente.
 - **Não confie no `Intl` para preços.** Ele separa `R$` do valor com espaço
   inseparável; `formatPrice` já normaliza isso.
 
-A função `limparParaWhatsApp` é a última barreira antes do envio e remove
-espaços inseparáveis, seletores de variação e marcas invisíveis de direção que
-podem entrar por colagem no nome ou no endereço. Ela é rede de proteção, não
-licença para reintroduzir caracteres arriscados no texto.
+`limparParaWhatsApp` é a última barreira antes do envio e remove espaços
+inseparáveis, seletores de variação e marcas invisíveis de direção que podem
+entrar por colagem no nome ou no endereço. É rede de proteção, não licença para
+reintroduzir caracteres arriscados.
 
 ## Decisões de interface
 
 O app é usado com uma mão, em movimento, muitas vezes com a tela suja de
 gordura. Isso define as regras:
 
+- **Rotas de verdade, não estado.** Sacola e checkout são endereços próprios, e
+  o botão voltar do sistema fecha a tela certa em vez de sair do aplicativo.
 - **Áreas seguras.** `viewport-fit=cover` no HTML e tokens `--safe-*` derivados
-  de `env(safe-area-inset-*)`. Sem isso, o CTA fixo cai embaixo do indicador de
+  de `env(safe-area-inset-*)`. Sem isso a barra fixa cai embaixo do indicador de
   gestos do iPhone e da barra de navegação do Android.
-- **Alvos de toque de 44px no mínimo** em todo controle interativo (WCAG 2.5.5).
-- **Sem depender de `hover`.** Estados de pressão usam as classes `.press` /
-  `.press-sm`, que recuam o elemento sem deslocar o layout ao redor.
-- **Feedback tátil** (`src/lib/haptics.ts`) apenas em confirmações reais.
-  Silencioso onde a API não existe — iOS Safari incluso.
+- **A barra inferior se mede.** Sua altura muda conforme aparece o aviso de
+  pedido mínimo ou de grupo pendente, então ela publica a altura real em
+  `--bar-h` e o conteúdo reserva esse espaço. Um valor fixo deixaria a última
+  seção escondida sempre que o aviso surgisse.
+- **Alvos de toque de 44px no mínimo** em todo controle (WCAG 2.5.5). O
+  interruptor de talheres substituiu uma caixa de seleção nativa justamente
+  porque ela tem 24px e não dá para ampliar sem distorcer.
+- **Sem depender de `hover`.** Estados de pressão usam `.press` / `.press-sm`,
+  que recuam o elemento sem deslocar o layout ao redor.
+- **Botão travado explica o motivo.** Com grupo obrigatório pendente, o CTA fica
+  inerte e a faixa acima diz o que falta — e leva até lá ao ser tocada.
 - **`prefers-reduced-motion`** desliga animações em laço e transformações.
-- **Erros de formulário ao lado do campo**, com `role="alert"` e foco levado ao
-  primeiro campo inválido.
 - **`h-dvh` em vez de `100vh`**, que no mobile conta a barra do navegador e
   empurra rodapés fixos para fora da tela.
+- **Feedback tátil** só em confirmações reais, silencioso onde a API não existe.
 
 ## Modelo de confiança
 
@@ -161,15 +185,36 @@ Todo o pedido é calculado no navegador e a URL do WhatsApp é montada no própr
 cliente. Sem servidor, **nada do que o cliente guarda pode ser tratado como
 confiável**.
 
-Por isso o carrinho persistido em `localStorage` grava apenas
-`{ id, quantity, notes }`. Preço, nome e descrição são sempre relidos de
-`src/data/products.ts` na carga. Guardar o preço permitiria editar o
-armazenamento local e enviar um pedido com valor forjado para a cozinha.
+Por isso a sacola persistida em `localStorage` grava apenas identificadores:
+id do produto, ids das opções, quantidades, observação e o código do cupom.
+Preço base, nome, acréscimos das opções e valor do desconto são sempre relidos
+de `src/data/` na carga. Guardar qualquer preço permitiria editar o
+armazenamento pelo DevTools e enviar à cozinha um pedido com valor forjado.
 
-A leitura ainda valida cada item: o `id` precisa existir no cardápio atual, a
-quantidade precisa ser inteira entre 1 e 99, a observação é truncada, e
-carrinhos com mais de 12 horas são descartados porque os preços podem ter
-mudado. Endereço e geolocalização nunca são persistidos.
+A leitura valida cada linha contra o catálogo:
+
+- o produto precisa existir;
+- o grupo precisa pertencer àquele produto;
+- a opção precisa pertencer àquele grupo e não estar esgotada;
+- a quantidade de cada opção e a soma do grupo precisam respeitar o `max`;
+- a quantidade da linha precisa ser inteira entre 1 e 99;
+- a observação é truncada;
+- o cupom é revalidado por código, inclusive o subtotal mínimo;
+- sacolas com mais de 12 horas são descartadas, porque os preços podem ter
+  mudado.
+
+JSON inválido, campos ausentes ou armazenamento bloqueado resultam em sacola
+vazia, nunca em exceção.
+
+**Endereço e geolocalização não são persistidos.** Os dados do checkout vivem só
+em memória: recarregar a página perde o formulário, o que é preferível a deixar
+o endereço de alguém gravado no navegador de um aparelho possivelmente
+compartilhado.
+
+**Cupons são conveniência, não defesa.** A validação é no cliente, então alguém
+determinado consegue aplicar um cupom pelo DevTools. Como o pedido passa pelo
+WhatsApp e a loja confirma na mão, um desconto indevido aparece na comanda antes
+de virar prejuízo.
 
 Se um dia entrar um backend, **o total precisa ser recalculado no servidor** a
 partir dos ids recebidos. A validação do cliente é conveniência, não defesa.
