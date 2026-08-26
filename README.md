@@ -6,6 +6,21 @@ para o WhatsApp da hamburgueria — não há backend, cadastro nem pagamento onl
 Mobile-first: praticamente todo o acesso vem de celular, e as decisões de
 interface partem daí.
 
+## Telas
+
+Capturas do aplicativo em execução, em viewport de celular (390 × 844).
+
+| Cardápio | Item no carrinho | Carrinho | Checkout |
+|---|---|---|---|
+| ![Cardápio com as promoções do dia](docs/screenshots/01-cardapio.jpg) | ![Card do produto com o controle de quantidade](docs/screenshots/02-produto-no-carrinho.jpg) | ![Carrinho aberto como painel inferior](docs/screenshots/03-carrinho.jpg) | ![Formulário de dados do checkout](docs/screenshots/04-checkout.jpg) |
+
+Da esquerda para a direita: a navegação por categorias com ancoragem de
+rolagem; o card depois do primeiro toque, com o botão de adicionar dando lugar
+ao controle de quantidade e o contador aparecendo na aba e no card; o carrinho
+como painel inferior arrastável, com o campo de observação aberto; e a segunda
+etapa do checkout, com validação por campo e a forma de pagamento marcada por
+ícone além da cor.
+
 ## Stack
 
 | Camada | Escolha |
@@ -30,6 +45,14 @@ npm run dev
 O servidor sobe em `http://localhost:8080` e também escuta na rede local — o
 endereço `Network:` que aparece no terminal permite abrir o app no celular,
 que é onde ele deve ser testado de verdade.
+
+> **A captura de localização não funciona pelo endereço da rede.** A API de
+> geolocalização do navegador só opera em contexto seguro: HTTPS ou
+> `localhost`. Abrindo por `http://192.168.x.x`, o botão "Usar minha
+> localização atual" avisa que é preciso HTTPS e o resto do pedido segue
+> normalmente. Para exercitar o mapa no celular, exponha o servidor por um
+> túnel HTTPS. Todo o restante da interface pode ser testado pela rede sem
+> ressalva.
 
 | Script | O que faz |
 |---|---|
@@ -91,6 +114,27 @@ Não há variáveis de ambiente. Os dois pontos que se ajustam no código:
 
 Ao remover um produto do cardápio, carrinhos salvos que o referenciem
 simplesmente descartam aquele item — não é preciso migrar nada.
+
+### Editando a comanda do WhatsApp
+
+A mensagem montada em `generateWhatsAppMessage` é **texto simples**, lido na
+correria da cozinha em aparelhos variados e com fontes incompletas. Ela já
+chegou corrompida uma vez, com fileiras de `?` no lugar das linhas
+separadoras e um `?` dentro de cada preço. Ao mexer nela:
+
+- **Use apenas ASCII e acentos.** Os separadores são hifens por isso. A versão
+  anterior usava `━` (U+2501), o traço pesado de desenho de caixa, ausente em
+  muitas fontes de sistema — eram 72 por comanda.
+- **Evite emoji.** Dependem de fonte colorida instalada, e alguns arrastam
+  junto o seletor de variação U+FE0F, que vira um quadrado sozinho. O negrito
+  do próprio WhatsApp, com `*asteriscos*`, já dá hierarquia suficiente.
+- **Não confie no `Intl` para preços.** Ele separa `R$` do valor com espaço
+  inseparável; `formatPrice` já normaliza isso.
+
+A função `limparParaWhatsApp` é a última barreira antes do envio e remove
+espaços inseparáveis, seletores de variação e marcas invisíveis de direção que
+podem entrar por colagem no nome ou no endereço. Ela é rede de proteção, não
+licença para reintroduzir caracteres arriscados no texto.
 
 ## Decisões de interface
 
