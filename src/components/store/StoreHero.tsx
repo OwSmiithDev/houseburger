@@ -1,16 +1,16 @@
 import { Bike, Clock, Star } from 'lucide-react';
-import { LOJA, PEDIDO_MINIMO, TAXA_ENTREGA } from '@/data/config';
 import { formatPrice } from '@/lib/format';
+import type { StoreSettings } from '@/types/order';
 
 /**
  * Cabeçalho da loja: banner com o cartão de informações sobreposto, como nas
  * referências. Nota, tempo e taxa ficam visíveis sem custar um toque.
  */
-export const StoreHero = () => (
+export const StoreHero = ({ settings }: { settings: StoreSettings }) => (
   <header className="relative">
     <div className="relative h-40 overflow-hidden bg-muted">
       <img
-        src={LOJA.banner}
+        src={settings.banner}
         alt=""
         width={800}
         height={400}
@@ -33,15 +33,15 @@ export const StoreHero = () => (
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-black leading-tight text-foreground">
-              {LOJA.nome}
+              {settings.name}
             </h1>
             <p className="flex items-center gap-1 text-sm text-muted-foreground">
               <Star
                 className="h-4 w-4 fill-secondary text-secondary"
                 aria-hidden="true"
               />
-              <span className="font-semibold text-foreground">{LOJA.avaliacao}</span>
-              <span>({LOJA.avaliacoes})</span>
+              <span className="font-semibold text-foreground">{settings.rating}</span>
+              <span>({settings.ratingsLabel})</span>
               <span aria-hidden="true">·</span>
               <span>Lanches</span>
             </p>
@@ -55,7 +55,7 @@ export const StoreHero = () => (
               Entrega
             </dt>
             <dd className="text-sm font-bold text-foreground">
-              {LOJA.tempoMin}-{LOJA.tempoMax} min
+              {settings.timeMin}-{settings.timeMax} min
             </dd>
           </div>
           <div className="border-x border-border">
@@ -64,13 +64,13 @@ export const StoreHero = () => (
               Taxa
             </dt>
             <dd className="text-sm font-bold text-foreground">
-              {formatPrice(TAXA_ENTREGA)}
+              {formatPrice(settings.deliveryFee)}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Mínimo</dt>
             <dd className="text-sm font-bold text-foreground">
-              {formatPrice(PEDIDO_MINIMO)}
+              {formatPrice(settings.minOrder)}
             </dd>
           </div>
         </dl>

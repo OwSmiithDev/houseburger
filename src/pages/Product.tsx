@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
-import { findProduct } from '@/data/products';
-import { MAX_OBSERVACAO } from '@/data/config';
+import { AlertCircle, Clock } from 'lucide-react';
+import { findProduct } from '@/data/catalog';
+
 import { OptionGroupField } from '@/components/product/OptionGroupField';
 import { AppBar } from '@/components/base/AppBar';
 import { BarButton, BottomBar } from '@/components/base/BottomBar';
@@ -14,14 +14,17 @@ import { haptic } from '@/lib/haptics';
 import type { CartLine } from '@/types/order';
 import { cn } from '@/lib/utils';
 
+const MAX_OBSERVACAO_LOCAL = 140;
+
 const novoLineId = () =>
   `l_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const Product = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { addLine } = useCart();
-  const product = findProduct(id);
+  const { catalog, addLine } = useCart();
+  const lojaFechada = !catalog.settings.open;
+  const product = findProduct(catalog, id);
 
   const [selections, setSelections] = useState<CartLine['selections']>({});
   const [quantity, setQuantity] = useState(1);
@@ -37,14 +40,14 @@ const Product = () => {
 
   const preview = useMemo(() => {
     if (!product) return null;
-    return resolverLinha({
+    return resolverLinha(catalog, {
       lineId: 'preview',
       productId: product.id,
       quantity,
       notes,
       selections,
     });
-  }, [product, quantity, notes, selections]);
+  }, [catalog, product, quantity, notes, selections]);
 
   // Produto inexistente na URL volta para a loja em vez de quebrar.
   if (!product) return <Navigate to="/" replace />;
@@ -69,14 +72,14 @@ const Product = () => {
   };
 
   const adicionar = () => {
-    if (pendentes.length > 0) return; // botão está desabilitado; guarda por segurança
+    if (pendentes.length > 0 || lojaFechada) return; // botão está desabilitado; guarda por segurança
 
     haptic('success');
     addLine({
       lineId: novoLineId(),
       productId: product.id,
       quantity,
-      notes: notes.trim().slice(0, MAX_OBSERVACAO),
+      notes: notes.trim().slice(0, MAX_OBSERVACAO_LOCAL),
       selections,
     });
     navigate('/', { replace: true });
@@ -150,21 +153,29 @@ const Product = () => {
           <textarea
             id="observacao"
             rows={3}
-            maxLength={MAX_OBSERVACAO}
+            maxLength={MAX_OBSERVACAO_LOCAL}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ex.: ponto da carne, retirar algum ingrediente"
             className="w-full resize-none rounded-xl border border-border bg-muted/40 px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
           />
           <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
-            {notes.length}/{MAX_OBSERVACAO}
+            {notes.length}/{MAX_OBSERVACAO_LOCAL}
           </p>
         </div>
       </div>
 
       <BottomBar
         above={
-          pendentes.length > 0 ? (
+          lojaFechada ? (
+            <div
+              role="status"
+              className="flex items-center gap-2 border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-sm font-semibold text-foreground"
+            >
+              <Clock className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+              Estamos fechados: não é possível pedir agora
+            </div>
+          ) : pendentes.length > 0 ? (
             <button
               type="button"
               onClick={irParaPendente}
@@ -190,7 +201,7 @@ const Product = () => {
       >
         <BarButton
           onClick={adicionar}
-          disabled={pendentes.length > 0}
+          disabled={pendentes.length > 0 || lojaFechada}
           aria-label="Adicionar ao pedido"
         >
           <span>Adicionar</span>

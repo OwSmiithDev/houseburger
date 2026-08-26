@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { Category, categories, categoryLabels, categoryIcons } from '@/types/order';
+import { iconePorNome, type Category, type CategoryInfo } from '@/types/order';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 interface CategoryChipsProps {
+  categories: CategoryInfo[];
   activeCategory: Category;
   onCategoryChange: (category: Category) => void;
   countByCategory?: Partial<Record<Category, number>>;
@@ -15,6 +16,7 @@ interface CategoryChipsProps {
  * ativo trazido para o centro.
  */
 export const CategoryChips = ({
+  categories,
   activeCategory,
   onCategoryChange,
   countByCategory = {},
@@ -34,9 +36,10 @@ export const CategoryChips = ({
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
     event.preventDefault();
-    const index = categories.indexOf(activeCategory);
+    const index = categories.findIndex((c) => c.slug === activeCategory);
     const offset = event.key === 'ArrowRight' ? 1 : -1;
-    onCategoryChange(categories[(index + offset + categories.length) % categories.length]);
+    const proxima = categories[(index + offset + categories.length) % categories.length];
+    if (proxima) onCategoryChange(proxima.slug);
   };
 
   return (
@@ -57,25 +60,25 @@ export const CategoryChips = ({
           onKeyDown={handleKeyDown}
           className="no-scrollbar snap-x-mandatory flex gap-2 overflow-x-auto px-4 py-3"
         >
-          {categories.map((category) => {
-            const Icon = categoryIcons[category];
-            const isActive = category === activeCategory;
-            const count = countByCategory[category] ?? 0;
+          {categories.map(({ slug, label, icon }) => {
+            const Icon = iconePorNome(icon);
+            const isActive = slug === activeCategory;
+            const count = countByCategory[slug] ?? 0;
 
             return (
               <button
-                key={category}
+                key={slug}
                 ref={isActive ? activeRef : undefined}
                 role="tab"
                 type="button"
-                id={`tab-${category}`}
+                id={`tab-${slug}`}
                 aria-selected={isActive}
                 aria-controls="painel-produtos"
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => {
                   if (isActive) return;
                   haptic('light');
-                  onCategoryChange(category);
+                  onCategoryChange(slug);
                 }}
                 className={cn(
                   'snap-start-always press-sm tap-target flex shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap transition-colors',
@@ -85,7 +88,7 @@ export const CategoryChips = ({
                 )}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} aria-hidden="true" />
-                <span>{categoryLabels[category]}</span>
+                <span>{label}</span>
 
                 {count > 0 && (
                   <span

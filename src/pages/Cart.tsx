@@ -8,8 +8,7 @@ import { Stepper } from '@/components/base/Stepper';
 import { Money, Pill } from '@/components/base/primitives';
 import { useCart } from '@/store/cart';
 import { calcularResumo } from '@/lib/pricing';
-import { findCoupon } from '@/data/coupons';
-import { PEDIDO_MINIMO } from '@/data/config';
+import { findCoupon } from '@/data/catalog';
 import { formatPrice } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -17,6 +16,7 @@ import { cn } from '@/lib/utils';
 const Cart = () => {
   const navigate = useNavigate();
   const {
+    catalog,
     linhas,
     lines,
     couponCode,
@@ -32,10 +32,10 @@ const Cart = () => {
   const [codigo, setCodigo] = useState('');
   const [abrindoCupom, setAbrindoCupom] = useState(false);
 
-  const resumo = calcularResumo({ linhas, deliveryType: 'delivery', couponCode });
+  const resumo = calcularResumo({ catalog, linhas, deliveryType: 'delivery', couponCode });
 
   const aplicarCupom = () => {
-    const cupom = findCoupon(codigo);
+    const cupom = findCoupon(catalog, codigo);
     if (!cupom) {
       haptic('warning');
       toast.error('Cupom inválido', { description: 'Confira o código digitado.' });
@@ -269,10 +269,17 @@ const Cart = () => {
 
       <BottomBar
         above={
-          !resumo.atingiuMinimo ? (
+          !catalog.settings.open ? (
+            <div
+              role="status"
+              className="border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-center text-sm font-semibold text-foreground"
+            >
+              Estamos fechados: não é possível finalizar agora
+            </div>
+          ) : !resumo.atingiuMinimo ? (
             <div className="border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-center text-sm font-semibold text-foreground">
               Faltam {formatPrice(resumo.faltaParaMinimo)} para o mínimo de{' '}
-              {formatPrice(PEDIDO_MINIMO)}
+              {formatPrice(catalog.settings.minOrder)}
             </div>
           ) : undefined
         }
@@ -285,7 +292,7 @@ const Cart = () => {
       >
         <BarButton
           onClick={() => navigate('/checkout')}
-          disabled={!resumo.atingiuMinimo}
+          disabled={!resumo.atingiuMinimo || !catalog.settings.open}
         >
           Continuar
         </BarButton>

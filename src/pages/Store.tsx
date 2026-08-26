@@ -2,22 +2,25 @@ import { useMemo, useState } from 'react';
 import { Search, ShoppingBag, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StoreHero } from '@/components/store/StoreHero';
+import { LojaFechada } from '@/components/LojaFechada';
 import { CategoryChips } from '@/components/store/CategoryChips';
 import { FeaturedCarousel } from '@/components/store/FeaturedCarousel';
 import { ProductRow } from '@/components/store/ProductRow';
 import { BarButton, BottomBar } from '@/components/base/BottomBar';
 import { Money, SectionTitle } from '@/components/base/primitives';
-import { products } from '@/data/products';
-import { PEDIDO_MINIMO } from '@/data/config';
 import { useCart } from '@/store/cart';
 import { calcularResumo } from '@/lib/pricing';
 import { formatPrice } from '@/lib/format';
-import { Category, categoryLabels } from '@/types/order';
+import type { Category } from '@/types/order';
 
 const Store = () => {
   const navigate = useNavigate();
-  const { linhas, totalItens, couponCode } = useCart();
-  const [activeCategory, setActiveCategory] = useState<Category>('promos');
+  const { catalog, linhas, totalItens, couponCode } = useCart();
+  const { products, categories, settings } = catalog;
+  // A primeira categoria do banco é o ponto de partida — não há mais lista fixa.
+  const [activeCategory, setActiveCategory] = useState<Category>(
+    () => categories[0]?.slug ?? '',
+  );
   const [busca, setBusca] = useState('');
 
   const buscando = busca.trim().length > 0;
@@ -30,14 +33,14 @@ const Store = () => {
         p.name.toLowerCase().includes(termo) ||
         p.description.toLowerCase().includes(termo),
     );
-  }, [busca]);
+  }, [busca, products]);
 
   const daCategoria = useMemo(
     () => products.filter((p) => p.category === activeCategory),
-    [activeCategory],
+    [activeCategory, products],
   );
 
-  const destaques = useMemo(() => products.filter((p) => p.featured), []);
+  const destaques = useMemo(() => products.filter((p) => p.featured), [products]);
 
   /** Unidades por produto, somando linhas com personalizações diferentes. */
   const quantidadePorProduto = useMemo(() => {
@@ -58,6 +61,7 @@ const Store = () => {
   }, [linhas]);
 
   const resumo = calcularResumo({
+    catalog,
     linhas,
     deliveryType: 'delivery',
     couponCode,
@@ -67,7 +71,8 @@ const Store = () => {
 
   return (
     <div className="min-h-dvh bg-background pb-bar">
-      <StoreHero />
+      {!settings.open && <LojaFechada />}
+      <StoreHero settings={settings} />
 
       <div className="px-4 py-4">
         <div className="relative">
@@ -106,6 +111,7 @@ const Store = () => {
           )}
 
           <CategoryChips
+            categories={categories}
             activeCategory={activeCategory}
             onCategoryChange={setActiveCategory}
             countByCategory={contagemPorCategoria}
@@ -123,7 +129,7 @@ const Store = () => {
           <h2 className="border-b border-border px-4 py-3 text-base font-bold text-foreground">
             {buscando
               ? `${resultados.length} ${resultados.length === 1 ? 'resultado' : 'resultados'} para "${busca.trim()}"`
-              : categoryLabels[activeCategory]}
+              : (categories.find((c) => c.slug === activeCategory)?.label ?? '')}
           </h2>
 
           {lista.length > 0 ? (
@@ -144,13 +150,13 @@ const Store = () => {
         </div>
       </main>
 
-      {totalItens > 0 && (
+      {totalItens > 0 && settings.open && (
         <BottomBar
           above={
             !resumo.atingiuMinimo ? (
               <div className="bg-success/12 border-t border-success/25 px-4 py-2 text-center text-sm font-semibold text-success">
                 Faltam {formatPrice(resumo.faltaParaMinimo)} para o pedido mínimo de{' '}
-                {formatPrice(PEDIDO_MINIMO)}
+                {formatPrice(settings.minOrder)}
               </div>
             ) : undefined
           }

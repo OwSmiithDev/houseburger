@@ -20,28 +20,31 @@ import { useCart } from '@/store/cart';
 import { useCheckout } from '@/store/checkout';
 import { calcularResumo } from '@/lib/pricing';
 import { montarComanda, whatsappUrl } from '@/lib/whatsapp';
-import { GORJETAS, LOJA } from '@/data/config';
+import { criarPedido } from '@/lib/orders';
 import { formatPrice } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
-import type { DeliveryType } from '@/types/order';
+import { paymentLabels, type DeliveryType } from '@/types/order';
 
-const iconesPagamento = { pix: QrCode, card: CreditCard, cash: Banknote } as const;
-const rotulosPagamento = {
-  pix: 'PIX',
-  card: 'Cartão na entrega',
-  cash: 'Dinheiro',
+const iconesPagamento = {
+  pix: QrCode,
+  credit: CreditCard,
+  debit: CreditCard,
+  cash: Banknote,
 } as const;
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { linhas, lines, couponCode, cutlery, clearCart } = useCart();
+  const { catalog, linhas, lines, couponCode, cutlery, clearCart } = useCart();
   const { customer, setCustomer, gorjeta, setGorjeta } = useCheckout();
   const [erros, setErros] = useState<{ name?: string; address?: string }>({});
   const [gorjetaOutra, setGorjetaOutra] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const { settings } = catalog;
 
   const entrega = customer.deliveryType === 'delivery';
   const resumo = calcularResumo({
+    catalog,
     linhas,
     deliveryType: customer.deliveryType,
     couponCode,
@@ -61,7 +64,7 @@ const Checkout = () => {
       return proximo;
     });
 
-  const enviar = () => {
+  const enviar = async () => {
     const achados: typeof erros = {};
     if (!customer.name.trim()) achados.name = 'Informe seu nome para identificarmos o pedido.';
     if (entrega && !customer.address?.trim()) achados.address = 'Informe o endereço da entrega.';
@@ -73,12 +76,44 @@ const Checkout = () => {
       return;
     }
 
-    haptic('success');
-    const mensagem = montarComanda({ linhas, resumo, customer, cutlery });
-    window.open(whatsappUrl(mensagem), '_blank', 'noopener,noreferrer');
-    toast.success('Pedido enviado!', { description: 'Confirme a conversa no WhatsApp.' });
-    clearCart();
-    navigate('/', { replace: true });
+    // A janela precisa ser aberta ANTES do await: navegadores só permitem
+    // window.open dentro do gesto do usuário, e abrir depois da resposta do
+    // servidor cairia no bloqueador de pop-up.
+    const aba = window.open('', '_blank', 'noopener,noreferrer');
+
+    setEnviando(true);
+    try {
+      // O banco recalcula tudo e devolve os valores verdadeiros. A comanda sai
+      // desse retorno, não do resumo que a tela calculou.
+      const pedido = await criarPedido({
+        linhas,
+        customer,
+        cutlery,
+        couponCode,
+        gorjeta,
+      });
+
+      const mensagem = montarComanda({ pedido, customer, cutlery });
+      const url = whatsappUrl(settings.whatsapp, mensagem);
+
+      if (aba) aba.location.href = url;
+      else window.open(url, '_blank', 'noopener,noreferrer');
+
+      haptic('success');
+      toast.success(`Pedido ${pedido.codigo} registrado!`, {
+        description: 'Confirme a conversa no WhatsApp.',
+      });
+      clearCart();
+      navigate('/', { replace: true });
+    } catch (erro) {
+      aba?.close();
+      haptic('warning');
+      toast.error('Não foi possível enviar o pedido', {
+        description: erro instanceof Error ? erro.message : 'Tente de novo.',
+      });
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const classeCampo = (temErro: boolean) =>
@@ -239,7 +274,7 @@ const Checkout = () => {
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-foreground">Forma de pagamento</span>
             <span className="block text-xs text-muted-foreground">
-              {rotulosPagamento[customer.paymentMethod]}
+              {paymentLabels[customer.paymentMethod]}
               {customer.paymentMethod === 'cash' && customer.changeFor
                 ? ` · troco para ${formatPrice(customer.changeFor)}`
                 : ''}
@@ -256,7 +291,7 @@ const Checkout = () => {
               Opcional. O valor é entregue em mãos junto com o pagamento.
             </p>
             <div className="flex flex-wrap gap-2">
-              {GORJETAS.map((valor) => (
+              {settings.tips.map((valor) => (
                 <button
                   key={valor}
                   type="button"
@@ -350,7 +385,7 @@ const Checkout = () => {
           {entrega && (
             <p className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
               <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Entrega estimada em {LOJA.tempoMin}-{LOJA.tempoMax} minutos após a confirmação
+              Entrega estimada em {settings.timeMin}-{settings.timeMax} minutos após a confirmação
             </p>
           )}
         </SectionCard>
@@ -364,9 +399,16 @@ const Checkout = () => {
           </div>
         }
       >
-        <BarButton onClick={enviar}>
-          <Send className="h-5 w-5" aria-hidden="true" />
-          Enviar pedido
+        <BarButton onClick={enviar} disabled={enviando || !settings.open}>
+          {enviando ? (
+            <span
+              className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent"
+              aria-hidden="true"
+            />
+          ) : (
+            <Send className="h-5 w-5" aria-hidden="true" />
+          )}
+          {enviando ? 'Enviando...' : 'Enviar pedido'}
         </BarButton>
       </BottomBar>
     </div>

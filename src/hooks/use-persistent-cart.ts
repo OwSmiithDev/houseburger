@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { findProduct } from '@/data/products';
-import { findCoupon } from '@/data/coupons';
-import { MAX_OBSERVACAO, MAX_QUANTIDADE_LINHA } from '@/data/config';
-import type { CartLine } from '@/types/order';
+import { findCoupon, findProduct } from '@/data/catalog';
+import type { CartLine, Catalog } from '@/types/order';
 
-const STORAGE_KEY = 'houseburger:cart:v2';
-/** Carrinho parado por mais de 12h é descartado: cardápio e preços podem ter mudado. */
+const STORAGE_KEY = 'houseburger:cart:v3';
+/** Sacola parada por mais de 12h é descartada: cardápio e preços podem ter mudado. */
 const MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const MAX_QUANTIDADE_LINHA = 99;
+const MAX_OBSERVACAO = 140;
 
 /**
  * O que vai para o disco é só referência: id do produto, ids das opções,
- * quantidades e o código do cupom. Nome, descrição, preço base e acréscimos
- * são relidos do catálogo a cada carga.
+ * quantidades e o código do cupom. Nome, preço base, acréscimos e o valor do
+ * desconto são sempre relidos do catálogo — que agora vem do banco.
  */
 interface StoredCart {
   savedAt: number;
@@ -20,6 +20,14 @@ interface StoredCart {
   cutlery: boolean;
 }
 
+interface EstadoCarrinho {
+  lines: CartLine[];
+  couponCode: string | null;
+  cutlery: boolean;
+}
+
+const VAZIO: EstadoCarrinho = { lines: [], couponCode: null, cutlery: false };
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -27,14 +35,14 @@ const inteiroEntre = (v: unknown, min: number, max: number): v is number =>
   typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
 
 /**
- * Reidrata uma linha, tratando o conteúdo salvo como entrada não confiável.
+ * Reidrata uma linha tratando o conteúdo salvo como entrada não confiável.
  *
- * localStorage é gravável pelo usuário (DevTools) e por qualquer script na
- * origem. Cada campo é conferido contra o catálogo: produto existe, grupo
- * pertence ao produto, opção pertence ao grupo, quantidade respeita o `max` do
- * grupo. Um acréscimo forjado não sobrevive porque o preço nunca vem daqui.
+ * localStorage é gravável pelo usuário e por qualquer script na origem. Cada
+ * campo é conferido contra o catálogo: produto existe e está disponível, grupo
+ * pertence ao produto, opção pertence ao grupo, quantidades respeitam o `max`.
+ * Um acréscimo forjado não sobrevive porque o preço nunca vem daqui.
  */
-const validarLinha = (entry: unknown): CartLine | null => {
+const validarLinha = (catalog: Catalog, entry: unknown): CartLine | null => {
   if (!isRecord(entry)) return null;
 
   const { lineId, productId, quantity, notes, selections } = entry;
@@ -42,8 +50,8 @@ const validarLinha = (entry: unknown): CartLine | null => {
   if (typeof productId !== 'string') return null;
   if (!inteiroEntre(quantity, 1, MAX_QUANTIDADE_LINHA)) return null;
 
-  const product = findProduct(productId);
-  if (!product) return null;
+  const product = findProduct(catalog, productId);
+  if (!product || product.soldOut) return null;
 
   const limpas: CartLine['selections'] = {};
 
@@ -59,7 +67,6 @@ const validarLinha = (entry: unknown): CartLine | null => {
         const q = marcadas[option.id];
         if (!inteiroEntre(q, 1, group.max)) continue;
         if (option.soldOut) continue;
-
         // O grupo inteiro não pode passar do próprio limite.
         if (totalDoGrupo + q > group.max) continue;
 
@@ -80,33 +87,31 @@ const validarLinha = (entry: unknown): CartLine | null => {
   };
 };
 
-const readCart = (): { lines: CartLine[]; couponCode: string | null; cutlery: boolean } => {
-  const vazio = { lines: [], couponCode: null, cutlery: false };
-
+const readCart = (catalog: Catalog): EstadoCarrinho => {
   let raw: string | null = null;
   try {
     raw = window.localStorage.getItem(STORAGE_KEY);
   } catch {
-    return vazio; // modo privado / armazenamento bloqueado
+    return VAZIO; // modo privado / armazenamento bloqueado
   }
-  if (!raw) return vazio;
+  if (!raw) return VAZIO;
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return vazio;
+    return VAZIO;
   }
 
-  if (!isRecord(parsed) || !Array.isArray(parsed.lines)) return vazio;
+  if (!isRecord(parsed) || !Array.isArray(parsed.lines)) return VAZIO;
   if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > MAX_AGE_MS) {
-    return vazio;
+    return VAZIO;
   }
 
   const lines: CartLine[] = [];
   const vistos = new Set<string>();
   for (const entry of parsed.lines) {
-    const linha = validarLinha(entry);
+    const linha = validarLinha(catalog, entry);
     if (!linha || vistos.has(linha.lineId)) continue;
     vistos.add(linha.lineId);
     lines.push(linha);
@@ -114,20 +119,20 @@ const readCart = (): { lines: CartLine[]; couponCode: string | null; cutlery: bo
 
   // O cupom também é revalidado: um código inventado não atravessa.
   const code =
-    typeof parsed.couponCode === 'string' && findCoupon(parsed.couponCode)
+    typeof parsed.couponCode === 'string' && findCoupon(catalog, parsed.couponCode)
       ? parsed.couponCode.trim().toUpperCase()
       : null;
 
   return { lines, couponCode: code, cutlery: parsed.cutlery === true };
 };
 
-const writeCart = (lines: CartLine[], couponCode: string | null, cutlery: boolean) => {
+const writeCart = (estado: EstadoCarrinho) => {
   try {
-    if (lines.length === 0) {
+    if (estado.lines.length === 0) {
       window.localStorage.removeItem(STORAGE_KEY);
       return;
     }
-    const payload: StoredCart = { savedAt: Date.now(), lines, couponCode, cutlery };
+    const payload: StoredCart = { savedAt: Date.now(), ...estado };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     /* cota estourada ou armazenamento bloqueado — segue em memória */
@@ -135,16 +140,16 @@ const writeCart = (lines: CartLine[], couponCode: string | null, cutlery: boolea
 };
 
 /**
- * Carrinho que sobrevive a recarregar a página e a sair para o WhatsApp e
- * voltar — no celular isso é rotina.
+ * Sacola que sobrevive a recarregar a página e a sair para o WhatsApp e voltar.
+ *
+ * Recebe o catálogo já carregado: sem ele não há como validar o que foi salvo,
+ * e é por isso que o `CatalogGate` monta este hook só depois da carga.
  */
-export const usePersistentCart = () => {
-  // Inicializador preguiçoso: lê uma vez, antes da primeira pintura, evitando
-  // o piscar de "carrinho vazio" que um useEffect causaria.
-  const [estado, setEstado] = useState(readCart);
+export const usePersistentCart = (catalog: Catalog) => {
+  const [estado, setEstado] = useState<EstadoCarrinho>(() => readCart(catalog));
 
   useEffect(() => {
-    writeCart(estado.lines, estado.couponCode, estado.cutlery);
+    writeCart(estado);
   }, [estado]);
 
   const setLines = useCallback(
@@ -155,14 +160,6 @@ export const usePersistentCart = () => {
 
   const addLine = useCallback(
     (line: CartLine) => setLines((anterior) => [...anterior, line]),
-    [setLines],
-  );
-
-  const updateLine = useCallback(
-    (lineId: string, patch: Partial<CartLine>) =>
-      setLines((anterior) =>
-        anterior.map((l) => (l.lineId === lineId ? { ...l, ...patch } : l)),
-      ),
     [setLines],
   );
 
@@ -196,17 +193,13 @@ export const usePersistentCart = () => {
     [],
   );
 
-  const clearCart = useCallback(
-    () => setEstado({ lines: [], couponCode: null, cutlery: false }),
-    [],
-  );
+  const clearCart = useCallback(() => setEstado(VAZIO), []);
 
   return {
     lines: estado.lines,
     couponCode: estado.couponCode,
     cutlery: estado.cutlery,
     addLine,
-    updateLine,
     removeLine,
     setQuantity,
     setCoupon,

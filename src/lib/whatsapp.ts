@@ -1,7 +1,6 @@
-import { LOJA } from '@/data/config';
 import { formatPrice } from '@/lib/format';
-import type { LinhaResolvida, ResumoPedido } from '@/lib/pricing';
-import type { CustomerData } from '@/types/order';
+import type { PedidoCriado } from '@/lib/orders';
+import { paymentLabels, type CustomerData, type StoreSettings } from '@/types/order';
 
 /**
  * Separador em ASCII puro. Traços de desenho de caixa (U+2501 e afins) não
@@ -38,68 +37,67 @@ export const limparParaWhatsApp = (texto: string) =>
 export const mapsUrl = ({ lat, lng }: { lat: number; lng: number }) =>
   `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`;
 
-const rotuloPagamento = {
-  pix: 'PIX',
-  card: 'Cartao na entrega',
-  cash: 'Dinheiro',
-} as const;
-
+/**
+ * Monta a comanda a partir do pedido que o BANCO devolveu.
+ *
+ * Nenhum valor aqui é recalculado no navegador: totais, descontos e taxas vêm
+ * de `create_order`. É isso que impede a comanda de sair com um número que o
+ * cliente escolheu.
+ */
 export const montarComanda = ({
-  linhas,
-  resumo,
+  pedido,
   customer,
   cutlery,
 }: {
-  linhas: LinhaResolvida[];
-  resumo: ResumoPedido;
+  pedido: PedidoCriado;
   customer: CustomerData;
   cutlery: boolean;
 }): string => {
   const entrega = customer.deliveryType === 'delivery';
 
-  const itens = linhas
-    .map(({ line, product, escolhas, total }) => {
-      const partes = [`- ${line.quantity}x ${product.name} - ${formatPrice(total)}`];
-      for (const { group, option, quantity } of escolhas) {
-        const qtd = quantity > 1 ? `${quantity}x ` : '';
-        partes.push(`   ${group.name}: ${qtd}${option.name}`);
+  const itens = pedido.itens
+    .map((item) => {
+      const partes = [`- ${item.quantidade}x ${item.nome} - ${formatPrice(item.total)}`];
+      for (const o of item.opcoes) {
+        const qtd = o.quantidade > 1 ? `${o.quantidade}x ` : '';
+        partes.push(`   ${o.grupo}: ${qtd}${o.opcao}`);
       }
-      if (line.notes) partes.push(`   Obs: ${line.notes}`);
+      if (item.observacao) partes.push(`   Obs: ${item.observacao}`);
       return partes.join('\n');
     })
     .join('\n');
 
-  let m = `*NOVO PEDIDO*\n\n`;
+  let m = `*NOVO PEDIDO ${pedido.codigo}*\n\n`;
   m += `*Cliente:* ${customer.name}\n`;
   m += `*Tipo:* ${entrega ? 'ENTREGA' : 'RETIRADA'}\n\n`;
 
   m += `${SEPARADOR}\n*ITENS*\n\n${itens}\n\n`;
 
   m += `${SEPARADOR}\n`;
-  m += `Subtotal: ${formatPrice(resumo.subtotal)}\n`;
+  m += `Subtotal: ${formatPrice(pedido.subtotal)}\n`;
 
-  if (resumo.cupom && resumo.desconto > 0) {
-    m += `Desconto (${resumo.cupom.code}): -${formatPrice(resumo.desconto)}\n`;
+  if (pedido.desconto > 0) {
+    m += `Desconto: -${formatPrice(pedido.desconto)}\n`;
   }
   if (entrega) {
-    m += resumo.entregaGratis
-      ? `Taxa de entrega: GRATIS (cupom ${resumo.cupom?.code ?? ''})\n`
-      : `Taxa de entrega: ${formatPrice(resumo.taxaEntrega)}\n`;
+    m += pedido.entrega_gratis
+      ? `Taxa de entrega: GRATIS (cupom)\n`
+      : `Taxa de entrega: ${formatPrice(pedido.taxa_entrega)}\n`;
   }
-  if (resumo.taxaServico > 0) {
-    m += `Taxa de servico: ${formatPrice(resumo.taxaServico)}\n`;
+  if (pedido.taxa_servico > 0) {
+    m += `Taxa de servico: ${formatPrice(pedido.taxa_servico)}\n`;
   }
-  if (resumo.gorjeta > 0) {
+  if (pedido.gorjeta > 0) {
     // Sem pagamento no aplicativo, a gorjeta é uma intenção: precisa ficar
     // explícito para quem entrega que o valor é cobrado junto, em mãos.
-    m += `Gorjeta ao entregador: ${formatPrice(resumo.gorjeta)} (a receber na entrega)\n`;
+    m += `Gorjeta ao entregador: ${formatPrice(pedido.gorjeta)} (a receber na entrega)\n`;
   }
-  m += `*TOTAL: ${formatPrice(resumo.total)}*\n`;
-  m += `*Pagamento:* ${rotuloPagamento[customer.paymentMethod]}\n`;
+  m += `*TOTAL: ${formatPrice(pedido.total)}*\n`;
+  m += `*Pagamento:* ${semAcento(paymentLabels[customer.paymentMethod])}\n`;
 
-  if (customer.paymentMethod === 'cash' && customer.changeFor) {
-    const troco = customer.changeFor - resumo.total;
-    m += `*Troco para:* ${formatPrice(customer.changeFor)}`;
+  if (customer.paymentMethod === 'cash' && pedido.troco_para) {
+    const troco = pedido.troco_para - pedido.total;
+    m += `*Troco para:* ${formatPrice(pedido.troco_para)}`;
     m += troco > 0 ? ` (levar ${formatPrice(troco)})\n` : `\n`;
   }
 
@@ -119,5 +117,9 @@ export const montarComanda = ({
   return limparParaWhatsApp(m);
 };
 
-export const whatsappUrl = (mensagem: string) =>
-  `https://wa.me/${LOJA.whatsapp}?text=${encodeURIComponent(mensagem)}`;
+/** Rótulos da interface têm acento; na comanda tiramos por segurança de fonte. */
+const semAcento = (texto: string) =>
+  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+export const whatsappUrl = (numero: StoreSettings['whatsapp'], mensagem: string) =>
+  `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;

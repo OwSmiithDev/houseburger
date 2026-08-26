@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { CartProvider } from "@/store/cart";
+import { CatalogGate } from "@/components/CatalogGate";
 import { CheckoutProvider } from "@/store/checkout";
 
 /*
@@ -20,6 +20,19 @@ const Payment = lazy(() => import("./pages/Payment"));
 const Address = lazy(() => import("./pages/Address"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+/*
+ * Admin em pedaços próprios. Estas telas trazem o supabase-js completo
+ * (autenticação e Storage, ~55 KB comprimidos), que nunca deve chegar ao
+ * cliente que só quer pedir um lanche.
+ */
+const AdminLogin = lazy(() => import("./pages/admin/Login"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminOrders = lazy(() => import("./pages/admin/Orders"));
+const AdminProducts = lazy(() => import("./pages/admin/Products"));
+const AdminGroups = lazy(() => import("./pages/admin/Groups"));
+const AdminCoupons = lazy(() => import("./pages/admin/Coupons"));
+const AdminStore = lazy(() => import("./pages/admin/StoreSettings"));
+
 const queryClient = new QueryClient();
 
 /** Placeholder neutro: sem spinner piscando em transição rápida. */
@@ -34,24 +47,41 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner position="top-center" />
-      <CartProvider>
-        <CheckoutProvider>
+      <CheckoutProvider>
           <BrowserRouter>
             <Suspense fallback={<Carregando />}>
               <Routes>
-                <Route path="/" element={<Store />} />
-                <Route path="/produto/:id" element={<Product />} />
-                <Route path="/sacola" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/pagamento" element={<Payment />} />
-                <Route path="/endereco" element={<Address />} />
-                {/* Rotas novas entram acima do catch-all */}
-                <Route path="*" element={<NotFound />} />
+                {/* Administração fora do CatalogGate: o dono precisa entrar
+                    mesmo com a loja fechada ou o cardápio com problema. */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/pedidos" element={<AdminOrders />} />
+                <Route path="/admin/produtos" element={<AdminProducts />} />
+                <Route path="/admin/grupos" element={<AdminGroups />} />
+                <Route path="/admin/cupons" element={<AdminCoupons />} />
+                <Route path="/admin/loja" element={<AdminStore />} />
+
+                {/* Cliente: nada renderiza sem catálogo carregado. */}
+                <Route
+                  path="/*"
+                  element={
+                    <CatalogGate>
+                      <Routes>
+                        <Route path="/" element={<Store />} />
+                        <Route path="/produto/:id" element={<Product />} />
+                        <Route path="/sacola" element={<Cart />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/pagamento" element={<Payment />} />
+                        <Route path="/endereco" element={<Address />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </CatalogGate>
+                  }
+                />
               </Routes>
             </Suspense>
           </BrowserRouter>
-        </CheckoutProvider>
-      </CartProvider>
+      </CheckoutProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

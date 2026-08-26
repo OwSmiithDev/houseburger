@@ -1,21 +1,29 @@
-import { findProduct } from '@/data/products';
-import { findCoupon, type Coupon } from '@/data/coupons';
-import { PEDIDO_MINIMO, TAXA_ENTREGA, TAXA_SERVICO } from '@/data/config';
-import type { CartLine, DeliveryType, OptionGroup, Product } from '@/types/order';
+import { findCoupon, findProduct } from '@/data/catalog';
+import type {
+  CartLine,
+  Catalog,
+  Coupon,
+  DeliveryType,
+  OptionGroup,
+  OptionItem,
+  Product,
+} from '@/types/order';
 
 /**
  * Cálculo do pedido em um lugar só.
  *
- * Antes o total era refeito em quatro componentes diferentes, o que abre espaço
- * para a tela mostrar um valor e a comanda enviar outro. Tudo aqui parte do
- * catálogo — nada de preço vindo do armazenamento local.
+ * O catálogo entra por parâmetro em vez de ser importado: os dados agora vêm do
+ * banco, e amarrar este módulo a uma origem fixa impediria tanto o admin quanto
+ * os testes de calcular sobre outro conjunto.
+ *
+ * Vale lembrar que este cálculo é para a TELA. O valor que vale é o que
+ * `create_order` devolve, porque só o banco pode ser considerado confiável.
  */
 
 export interface LinhaResolvida {
   line: CartLine;
   product: Product;
-  /** Grupo e opção já resolvidos, na ordem em que o produto os declara. */
-  escolhas: Array<{ group: OptionGroup; option: { id: string; name: string; priceDelta: number }; quantity: number }>;
+  escolhas: Array<{ group: OptionGroup; option: OptionItem; quantity: number }>;
   /** Preço de uma unidade, base + acréscimos. */
   unitario: number;
   /** unitario × quantidade */
@@ -23,8 +31,11 @@ export interface LinhaResolvida {
 }
 
 /** Resolve uma linha contra o catálogo. Devolve null se o produto sumiu. */
-export const resolverLinha = (line: CartLine): LinhaResolvida | null => {
-  const product = findProduct(line.productId);
+export const resolverLinha = (
+  catalog: Catalog,
+  line: CartLine,
+): LinhaResolvida | null => {
+  const product = findProduct(catalog, line.productId);
   if (!product) return null;
 
   const escolhas: LinhaResolvida['escolhas'] = [];
@@ -46,8 +57,13 @@ export const resolverLinha = (line: CartLine): LinhaResolvida | null => {
   return { line, product, escolhas, unitario, total: unitario * line.quantity };
 };
 
-export const resolverCarrinho = (lines: CartLine[]): LinhaResolvida[] =>
-  lines.map(resolverLinha).filter((l): l is LinhaResolvida => l !== null);
+export const resolverCarrinho = (
+  catalog: Catalog,
+  lines: CartLine[],
+): LinhaResolvida[] =>
+  lines
+    .map((l) => resolverLinha(catalog, l))
+    .filter((l): l is LinhaResolvida => l !== null);
 
 /** Um grupo obrigatório está satisfeito quando o total marcado atinge `min`. */
 export const totalMarcado = (
@@ -61,7 +77,7 @@ export const grupoPendente = (
   selections: CartLine['selections'],
 ): boolean => totalMarcado(selections, group.id) < group.min;
 
-/** Grupos obrigatórios que ainda faltam, para explicar por que o botão está travado. */
+/** Grupos obrigatórios que ainda faltam, para explicar por que o botão trava. */
 export const gruposPendentes = (
   product: Product,
   selections: CartLine['selections'],
@@ -75,7 +91,6 @@ export interface ResumoPedido {
   cupom: Coupon | null;
   /** Taxa cheia, para riscar na tela quando o frete for cortesia. */
   taxaEntregaCheia: number;
-  /** O que de fato entra na conta. */
   taxaEntrega: number;
   entregaGratis: boolean;
   taxaServico: number;
@@ -87,23 +102,26 @@ export interface ResumoPedido {
 }
 
 export const calcularResumo = ({
+  catalog,
   linhas,
   deliveryType,
   couponCode,
   gorjeta = 0,
 }: {
+  catalog: Catalog;
   linhas: LinhaResolvida[];
   deliveryType: DeliveryType;
   couponCode?: string | null;
   gorjeta?: number;
 }): ResumoPedido => {
+  const { deliveryFee, serviceFeeRate, minOrder } = catalog.settings;
   const subtotal = linhas.reduce((soma, l) => soma + l.total, 0);
 
   // O cupom é relido do catálogo pelo código; valor salvo nunca é usado.
-  const cupom = couponCode ? findCoupon(couponCode) ?? null : null;
+  const cupom = couponCode ? findCoupon(catalog, couponCode) ?? null : null;
   const cupomVale = cupom !== null && subtotal >= cupom.minSubtotal;
 
-  const taxaEntregaCheia = deliveryType === 'delivery' ? TAXA_ENTREGA : 0;
+  const taxaEntregaCheia = deliveryType === 'delivery' ? deliveryFee : 0;
 
   // Frete grátis aparece na própria linha da taxa, não como desconto — somar
   // nos dois lugares contaria a economia duas vezes.
@@ -115,12 +133,12 @@ export const calcularResumo = ({
   if (cupomVale && cupom.type === 'fixed') desconto = cupom.value;
   desconto = Math.min(desconto, subtotal);
 
-  const taxaServico = subtotal * TAXA_SERVICO;
+  const taxaServico = subtotal * serviceFeeRate;
   const total = Math.max(
     0,
     subtotal - desconto + taxaEntrega + taxaServico + gorjeta,
   );
-  const faltaParaMinimo = Math.max(0, PEDIDO_MINIMO - subtotal);
+  const faltaParaMinimo = Math.max(0, minOrder - subtotal);
 
   return {
     subtotal,
