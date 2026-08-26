@@ -181,7 +181,24 @@ begin
   end if;
 
   if v_tipo_entrega = 'delivery' then
-    v_taxa_entrega := cfg.taxa_entrega;
+    -- A taxa é calculada aqui, nunca aceita do cliente. No modo por
+    -- quilômetro isso também é o que impede alguém de pedir de longe
+    -- pagando o frete de perto.
+    v_taxa_entrega := taxa_entrega_para(
+      (payload->>'lat')::numeric, (payload->>'lng')::numeric
+    );
+
+    if v_taxa_entrega is null then
+      raise exception 'Endereço fora da área de entrega (raio de % km)', cfg.raio_maximo_km;
+    end if;
+
+    -- No modo por quilômetro o ponto no mapa é obrigatório: sem ele não há
+    -- como medir, e cair na taxa fixa premiaria quem não marcasse.
+    if cfg.entrega_modo = 'km'
+       and cfg.lat is not null
+       and (payload->>'lat') is null then
+      raise exception 'Marque o local da entrega no mapa para calcularmos a taxa';
+    end if;
   end if;
 
   -- O cupom é buscado pelo código; o desconto que o cliente calculou é ignorado.
@@ -224,6 +241,10 @@ begin
 
   return jsonb_build_object(
     'id', v_order_id, 'codigo', v_codigo, 'itens', v_itens,
+    'distancia_km', case
+      when v_tipo_entrega = 'delivery' and cfg.lat is not null and (payload->>'lat') is not null
+      then distancia_km(cfg.lat, cfg.lng, (payload->>'lat')::numeric, (payload->>'lng')::numeric)
+      else null end,
     'subtotal', v_subtotal, 'desconto', v_desconto,
     'taxa_entrega', v_taxa_entrega, 'entrega_gratis', v_entrega_gratis,
     'taxa_servico', v_taxa_servico, 'gorjeta', v_gorjeta,

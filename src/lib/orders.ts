@@ -33,6 +33,8 @@ export interface PedidoCriado {
   gorjeta: number;
   total: number;
   troco_para: number | null;
+  /** Distância até o cliente, quando a taxa é por quilômetro. */
+  distancia_km: number | null;
 }
 
 /**

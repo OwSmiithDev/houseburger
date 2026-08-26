@@ -85,11 +85,26 @@ export interface StoreSettings {
   ratingsLabel: string;
   timeMin: number;
   timeMax: number;
-  deliveryFee: number;
   serviceFeeRate: number;
   minOrder: number;
   tips: number[];
   open: boolean;
+
+  /** Endereço da loja, mostrado a quem escolhe retirar. */
+  address: string;
+  /** Coordenadas da loja: base do cálculo por distância e do link do mapa. */
+  lat: number | null;
+  lng: number | null;
+
+  /** 'fixo' = taxa única; 'km' = base + valor por quilômetro. */
+  deliveryMode: 'fixo' | 'km';
+  /** Taxa única, usada no modo fixo e como reserva quando falta coordenada. */
+  deliveryFee: number;
+  /** Parcela fixa cobrada antes dos quilômetros. */
+  deliveryBase: number;
+  deliveryPerKm: number;
+  /** Além deste raio a loja não entrega. Nulo = sem limite. */
+  deliveryMaxKm: number | null;
 }
 
 /** Tudo que o cliente precisa para montar um pedido, em uma carga só. */

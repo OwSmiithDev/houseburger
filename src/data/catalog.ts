@@ -49,11 +49,21 @@ const buscarCatalogo = async (): Promise<Catalog> => {
     ratingsLabel: cfg.data.avaliacoes,
     timeMin: cfg.data.tempo_min,
     timeMax: cfg.data.tempo_max,
-    deliveryFee: Number(cfg.data.taxa_entrega),
     serviceFeeRate: Number(cfg.data.taxa_servico),
     minOrder: Number(cfg.data.pedido_minimo),
     tips: (cfg.data.gorjetas ?? []).map(Number),
     open: cfg.data.aberta,
+
+    address: cfg.data.endereco ?? '',
+    lat: cfg.data.lat === null ? null : Number(cfg.data.lat),
+    lng: cfg.data.lng === null ? null : Number(cfg.data.lng),
+
+    deliveryMode: cfg.data.entrega_modo ?? 'fixo',
+    deliveryFee: Number(cfg.data.taxa_entrega),
+    deliveryBase: Number(cfg.data.taxa_base ?? 0),
+    deliveryPerKm: Number(cfg.data.taxa_por_km ?? 0),
+    deliveryMaxKm:
+      cfg.data.raio_maximo_km === null ? null : Number(cfg.data.raio_maximo_km),
   };
 
   const categories: CategoryInfo[] = (cats.data ?? []).map((c) => ({

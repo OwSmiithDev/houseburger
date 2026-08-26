@@ -48,10 +48,12 @@ export const montarComanda = ({
   pedido,
   customer,
   cutlery,
+  settings,
 }: {
   pedido: PedidoCriado;
   customer: CustomerData;
   cutlery: boolean;
+  settings: StoreSettings;
 }): string => {
   const entrega = customer.deliveryType === 'delivery';
 
@@ -80,9 +82,10 @@ export const montarComanda = ({
     m += `Desconto: -${formatPrice(pedido.desconto)}\n`;
   }
   if (entrega) {
+    const dist = pedido.distancia_km ? ` (${pedido.distancia_km} km)` : '';
     m += pedido.entrega_gratis
-      ? `Taxa de entrega: GRATIS (cupom)\n`
-      : `Taxa de entrega: ${formatPrice(pedido.taxa_entrega)}\n`;
+      ? `Taxa de entrega: GRATIS (cupom)${dist}\n`
+      : `Taxa de entrega: ${formatPrice(pedido.taxa_entrega)}${dist}\n`;
   }
   if (pedido.taxa_servico > 0) {
     m += `Taxa de servico: ${formatPrice(pedido.taxa_servico)}\n`;
@@ -109,6 +112,13 @@ export const montarComanda = ({
     if (customer.complement) m += `Complemento: ${customer.complement}\n`;
     if (customer.location) {
       m += `\n*Localizacao no Maps:*\n${mapsUrl(customer.location)}\n`;
+    }
+  } else if (settings.address) {
+    // Na retirada o endereco que importa e o da LOJA: a comanda serve
+    // tambem de comprovante para quem nao olhou o cardapio.
+    m += `\n${SEPARADOR}\n*RETIRAR EM*\n${semAcento(settings.address)}\n`;
+    if (settings.lat !== null && settings.lng !== null) {
+      m += `${mapsUrl({ lat: settings.lat, lng: settings.lng })}\n`;
     }
   }
 

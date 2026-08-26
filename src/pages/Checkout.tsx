@@ -11,6 +11,8 @@ import {
   Send,
   Store,
   Truck,
+  Navigation,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppBar } from '@/components/base/AppBar';
@@ -19,7 +21,7 @@ import { Money, Pill, SectionCard } from '@/components/base/primitives';
 import { useCart } from '@/store/cart';
 import { useCheckout } from '@/store/checkout';
 import { calcularResumo } from '@/lib/pricing';
-import { montarComanda, whatsappUrl } from '@/lib/whatsapp';
+import { mapsUrl, montarComanda, whatsappUrl } from '@/lib/whatsapp';
 import { criarPedido } from '@/lib/orders';
 import { formatPrice } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
@@ -49,7 +51,14 @@ const Checkout = () => {
     deliveryType: customer.deliveryType,
     couponCode,
     gorjeta,
+    destino: customer.location,
   });
+
+  // No modo por quilômetro sem ponto no mapa não há como calcular a taxa, e o
+  // banco recusa o pedido. Melhor barrar aqui, antes de o cliente tentar.
+  const faltaLocalizacao = entrega && resumo.entrega.precisaLocalizacao;
+  const foraDeArea = entrega && resumo.entrega.foraDeArea;
+  const podeEnviar = settings.open && !faltaLocalizacao && !foraDeArea;
 
   // Sacola esvaziada em outra aba, ou entrada direta pela URL.
   useEffect(() => {
@@ -93,7 +102,7 @@ const Checkout = () => {
         gorjeta,
       });
 
-      const mensagem = montarComanda({ pedido, customer, cutlery });
+      const mensagem = montarComanda({ pedido, customer, cutlery, settings });
       const url = whatsappUrl(settings.whatsapp, mensagem);
 
       if (aba) aba.location.href = url;
@@ -261,6 +270,29 @@ const Checkout = () => {
           )}
         </SectionCard>
 
+        {/* Onde retirar */}
+        {!entrega && settings.address && (
+          <SectionCard>
+            <h2 className="mb-1 text-base font-bold text-foreground">Retirar em</h2>
+            <p className="text-sm text-muted-foreground">{settings.address}</p>
+            {settings.lat !== null && settings.lng !== null && (
+              <a
+                href={mapsUrl({ lat: settings.lat, lng: settings.lng })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="press-sm mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-primary"
+              >
+                <MapPin className="h-4 w-4" aria-hidden="true" />
+                Abrir no mapa
+              </a>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Pronto em {settings.timeMin}-{settings.timeMax} minutos após a
+              confirmação.
+            </p>
+          </SectionCard>
+        )}
+
         {/* Pagamento */}
         <button
           type="button"
@@ -348,7 +380,14 @@ const Checkout = () => {
 
             {entrega && (
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Taxa de entrega</dt>
+                <dt className="text-muted-foreground">
+                  Taxa de entrega
+                  {resumo.entrega.distancia !== null && (
+                    <span className="ml-1 text-xs">
+                      ({resumo.entrega.distancia} km)
+                    </span>
+                  )}
+                </dt>
                 <dd>
                   {resumo.entregaGratis ? (
                     <span className="flex items-center gap-2">
@@ -392,6 +431,29 @@ const Checkout = () => {
       </div>
 
       <BottomBar
+        above={
+          foraDeArea ? (
+            <div
+              role="alert"
+              className="flex items-center gap-2 border-t border-destructive/25 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Fora da área de entrega ({resumo.entrega.distancia} km, limite{' '}
+              {settings.deliveryMaxKm} km)
+            </div>
+          ) : faltaLocalizacao ? (
+            <button
+              type="button"
+              onClick={() => navigate('/endereco')}
+              className="press flex w-full items-center gap-2 border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-left text-sm font-semibold text-foreground"
+            >
+              <Navigation className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                Marque o local no mapa para calcularmos a entrega
+              </span>
+            </button>
+          ) : undefined
+        }
         left={
           <div className="leading-tight">
             <p className="text-xs text-muted-foreground">Total</p>
@@ -399,7 +461,7 @@ const Checkout = () => {
           </div>
         }
       >
-        <BarButton onClick={enviar} disabled={enviando || !settings.open}>
+        <BarButton onClick={enviar} disabled={enviando || !podeEnviar}>
           {enviando ? (
             <span
               className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent"

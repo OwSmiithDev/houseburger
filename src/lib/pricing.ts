@@ -84,6 +84,95 @@ export const gruposPendentes = (
 ): OptionGroup[] =>
   (product.groups ?? []).filter((g) => grupoPendente(g, selections));
 
+/**
+ * Distância em linha reta entre duas coordenadas (haversine).
+ *
+ * Espelha `distancia_km` do banco. Aqui serve só para MOSTRAR a taxa antes de
+ * fechar o pedido; o valor que vale é o que `create_order` devolve. Se as duas
+ * divergirem, quem manda é o servidor.
+ */
+export const distanciaKm = (
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number => {
+  const rad = (g: number) => (g * Math.PI) / 180;
+  const cosseno =
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lng2) - rad(lng1)) +
+    Math.sin(rad(lat1)) * Math.sin(rad(lat2));
+  // O arredondamento do ponto flutuante pode passar de 1 e quebrar o acos.
+  const km = 6371 * Math.acos(Math.min(1, Math.max(-1, cosseno)));
+  return Math.round(km * 100) / 100;
+};
+
+export interface EntregaCalculada {
+  /** Nulo quando não há como medir (falta coordenada). */
+  distancia: number | null;
+  taxa: number;
+  /** Fora do raio atendido: o pedido será recusado. */
+  foraDeArea: boolean;
+  /** No modo por quilômetro, sem ponto no mapa não dá para calcular. */
+  precisaLocalizacao: boolean;
+}
+
+/** Espelha `taxa_entrega_para` do banco. */
+export const calcularEntrega = (
+  settings: Catalog['settings'],
+  destino?: { lat: number; lng: number } | null,
+): EntregaCalculada => {
+  if (settings.deliveryMode !== 'km') {
+    return {
+      distancia: null,
+      taxa: settings.deliveryFee,
+      foraDeArea: false,
+      precisaLocalizacao: false,
+    };
+  }
+
+  const lojaSemCoordenada = settings.lat === null || settings.lng === null;
+
+  // Sem coordenada da loja não há como medir: cai na taxa fixa em vez de
+  // cobrar zero por engano.
+  if (lojaSemCoordenada) {
+    return {
+      distancia: null,
+      taxa: settings.deliveryFee,
+      foraDeArea: false,
+      precisaLocalizacao: false,
+    };
+  }
+
+  if (!destino) {
+    return {
+      distancia: null,
+      taxa: settings.deliveryFee,
+      foraDeArea: false,
+      precisaLocalizacao: true,
+    };
+  }
+
+  const distancia = distanciaKm(
+    settings.lat as number,
+    settings.lng as number,
+    destino.lat,
+    destino.lng,
+  );
+
+  if (settings.deliveryMaxKm !== null && distancia > settings.deliveryMaxKm) {
+    return { distancia, taxa: 0, foraDeArea: true, precisaLocalizacao: false };
+  }
+
+  return {
+    distancia,
+    taxa:
+      Math.round((settings.deliveryBase + settings.deliveryPerKm * distancia) * 100) /
+      100,
+    foraDeArea: false,
+    precisaLocalizacao: false,
+  };
+};
+
 export interface ResumoPedido {
   subtotal: number;
   /** Desconto em dinheiro. Cupom de frete não entra aqui — ver `entregaGratis`. */
@@ -93,6 +182,8 @@ export interface ResumoPedido {
   taxaEntregaCheia: number;
   taxaEntrega: number;
   entregaGratis: boolean;
+  /** Detalhe do cálculo: distância, se falta localização, se está fora de área. */
+  entrega: EntregaCalculada;
   taxaServico: number;
   gorjeta: number;
   total: number;
@@ -107,14 +198,19 @@ export const calcularResumo = ({
   deliveryType,
   couponCode,
   gorjeta = 0,
+  destino,
 }: {
   catalog: Catalog;
   linhas: LinhaResolvida[];
   deliveryType: DeliveryType;
   couponCode?: string | null;
   gorjeta?: number;
+  /** Ponto de entrega, para o cálculo por distância. */
+  destino?: { lat: number; lng: number } | null;
 }): ResumoPedido => {
-  const { deliveryFee, serviceFeeRate, minOrder } = catalog.settings;
+  const { serviceFeeRate, minOrder } = catalog.settings;
+  const entrega = calcularEntrega(catalog.settings, destino);
+  const deliveryFee = entrega.taxa;
   const subtotal = linhas.reduce((soma, l) => soma + l.total, 0);
 
   // O cupom é relido do catálogo pelo código; valor salvo nunca é usado.
@@ -147,6 +243,7 @@ export const calcularResumo = ({
     taxaEntregaCheia,
     taxaEntrega,
     entregaGratis,
+    entrega,
     taxaServico,
     gorjeta,
     total,

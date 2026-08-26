@@ -143,3 +143,82 @@ create or replace function gerar_codigo_pedido() returns text
 language sql volatile as $$
   select 'HB-' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 4));
 $$;
+
+-- ============================================================================
+-- Localização da loja e taxa de entrega por distância
+--
+-- ALTER idempotente: vale tanto para banco novo quanto para o já existente.
+-- ============================================================================
+
+alter table store_settings
+  add column if not exists endereco       text not null default '',
+  add column if not exists lat            numeric(10,6),
+  add column if not exists lng            numeric(10,6),
+  -- 'fixo' = uma taxa só; 'km' = base + valor por quilômetro em linha reta
+  add column if not exists entrega_modo   text not null default 'fixo'
+                                          check (entrega_modo in ('fixo','km')),
+  add column if not exists taxa_base      numeric(10,2) not null default 0
+                                          check (taxa_base >= 0),
+  add column if not exists taxa_por_km    numeric(10,2) not null default 0
+                                          check (taxa_por_km >= 0),
+  -- Além deste raio a loja não entrega. Nulo = sem limite.
+  add column if not exists raio_maximo_km numeric(6,2)
+                                          check (raio_maximo_km is null or raio_maximo_km > 0);
+
+/*
+ * Distância em linha reta entre duas coordenadas (fórmula de haversine).
+ *
+ * É distância de mapa, não de rua: o percurso real costuma ser 20 a 40% maior.
+ * Quem define a taxa precisa considerar isso ao escolher o valor por
+ * quilômetro — a alternativa seria uma API de rotas, com custo e chave.
+ */
+create or replace function distancia_km(
+  lat1 numeric, lng1 numeric, lat2 numeric, lng2 numeric
+) returns numeric
+language sql immutable as $$
+  select round(
+    (6371 * acos(
+      least(1, greatest(-1,
+        cos(radians(lat1)) * cos(radians(lat2)) * cos(radians(lng2) - radians(lng1))
+        + sin(radians(lat1)) * sin(radians(lat2))
+      ))
+    ))::numeric, 2)
+$$;
+
+/*
+ * Taxa de entrega para um destino.
+ *
+ * Devolve NULL quando o destino está fora do raio atendido — quem chama decide
+ * se recusa o pedido ou apenas avisa.
+ */
+create or replace function taxa_entrega_para(dest_lat numeric, dest_lng numeric)
+returns numeric
+language plpgsql stable as $$
+declare
+  cfg  store_settings%rowtype;
+  dist numeric;
+begin
+  select * into cfg from store_settings where id = 1;
+
+  if cfg.entrega_modo <> 'km' then
+    return cfg.taxa_entrega;
+  end if;
+
+  -- Sem coordenada da loja ou do cliente não há como medir; cai na taxa fixa
+  -- em vez de cobrar zero por engano.
+  if cfg.lat is null or cfg.lng is null or dest_lat is null or dest_lng is null then
+    return cfg.taxa_entrega;
+  end if;
+
+  dist := distancia_km(cfg.lat, cfg.lng, dest_lat, dest_lng);
+
+  if cfg.raio_maximo_km is not null and dist > cfg.raio_maximo_km then
+    return null;
+  end if;
+
+  return round(cfg.taxa_base + cfg.taxa_por_km * dist, 2);
+end;
+$$;
+
+grant execute on function distancia_km(numeric, numeric, numeric, numeric) to anon, authenticated;
+grant execute on function taxa_entrega_para(numeric, numeric) to anon, authenticated;
