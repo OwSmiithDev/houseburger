@@ -1,7 +1,8 @@
 # House Burger
 
-Cardápio digital para pedidos. O cliente monta o pedido no celular e envia direto
-para o WhatsApp da hamburgueria — não há backend, cadastro nem pagamento online.
+Cardápio digital para pedidos. O cliente monta o pedido no celular e envia a
+comanda para o WhatsApp da loja; o dono administra cardápio, preços, taxas e
+pedidos por um painel próprio, sem tocar em código.
 
 Mobile-first: praticamente todo o acesso vem de celular, e as decisões de
 interface partem daí.
@@ -10,13 +11,18 @@ interface partem daí.
 
 Capturas do aplicativo em execução, em viewport de celular (390 × 844).
 
-| Cardápio | Personalização | Sacola |
-|---|---|---|
-| ![Loja com vitrine de destaques e categorias](docs/screenshots/01-cardapio.jpg) | ![Grupos de opções obrigatórias do produto](docs/screenshots/02-personalizacao.jpg) | ![Sacola com as escolhas listadas e cupom](docs/screenshots/03-sacola.jpg) |
-
-| Checkout | Endereço |
-|---|---|
-| ![Resumo com taxas, gorjeta e total](docs/screenshots/04-checkout.jpg) | ![Mapa com marcador arrastável](docs/screenshots/05-mapa.jpg) |
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-cardapio.jpg" width="200" alt="Cardápio com vitrine de destaques e categorias"><br><sub><b>Cardápio</b></sub></td>
+    <td align="center"><img src="docs/screenshots/02-personalizacao.jpg" width="200" alt="Grupos de opções obrigatórias do produto"><br><sub><b>Personalização</b></sub></td>
+    <td align="center"><img src="docs/screenshots/03-sacola.jpg" width="200" alt="Sacola com as escolhas listadas e cupom"><br><sub><b>Sacola</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/04-checkout.jpg" width="200" alt="Resumo com taxas, gorjeta e total"><br><sub><b>Checkout</b></sub></td>
+    <td align="center"><img src="docs/screenshots/05-mapa.jpg" width="200" alt="Mapa com marcador arrastável"><br><sub><b>Endereço no mapa</b></sub></td>
+    <td align="center"><img src="docs/screenshots/06-admin.jpg" width="200" alt="Painel administrativo com a lista de produtos"><br><sub><b>Administração</b></sub></td>
+  </tr>
+</table>
 
 ## Como funciona
 
@@ -28,7 +34,10 @@ Capturas do aplicativo em execução, em viewport de celular (390 × 844).
    com opções diferentes são pedidos diferentes. Cupom e talheres aqui.
 4. **Checkout** — retirada ou entrega, dados, gorjeta e o resumo com as contas
    abertas: subtotal, desconto, taxa de entrega, taxa de serviço e total.
-5. **WhatsApp** — a comanda sai formatada para a cozinha.
+5. **Registro e comanda** — o pedido é gravado no banco, que recalcula os
+   valores, e a comanda sai formatada para o WhatsApp da cozinha.
+
+O dono acompanha os pedidos e edita o cardápio em `/admin`.
 
 ## Stack
 
@@ -38,14 +47,17 @@ Capturas do aplicativo em execução, em viewport de celular (390 × 844).
 | UI | React 18 + TypeScript |
 | Estilo | Tailwind CSS 3 + shadcn/ui |
 | Rotas | React Router 7 |
+| Dados e autenticação | Supabase (Postgres + Auth + Storage) |
 | Mapa | Leaflet + OpenStreetMap |
 | Ícones | lucide-react |
-| Notificações | sonner |
 
 ## Rodando localmente
 
 Requer **Node.js 20.19+ ou 22.12+** — o Vite 7 declara
 `^20.19.0 || >=22.12.0`, então a linha 21.x fica de fora.
+
+O banco precisa estar configurado antes: veja [docs/SUPABASE.md](docs/SUPABASE.md).
+Depois copie `.env.example` para `.env` e preencha as duas variáveis.
 
 ```sh
 npm install
@@ -60,8 +72,7 @@ que é onde ele deve ser testado de verdade.
 > opera em contexto seguro: HTTPS ou `localhost`. Abrindo por
 > `http://192.168.x.x`, o botão de localização avisa que é preciso HTTPS —
 > mas o mapa continua utilizável arrastando o marcador, que é o caminho
-> principal de qualquer forma. Todo o restante da interface pode ser testado
-> pela rede sem ressalva.
+> principal de qualquer forma.
 
 | Script | O que faz |
 |---|---|
@@ -86,6 +97,12 @@ playwright install chromium
 ## Estrutura
 
 ```
+supabase/                       scripts SQL do banco
+├── schema.sql                  tabelas, localização e taxa por distância
+├── rls.sql                     quem pode ler e escrever
+├── functions.sql               create_order, a validação do pedido
+└── seed.sql                    carga inicial do cardápio
+
 src/
 ├── pages/                      uma rota por arquivo
 │   ├── Store.tsx               /              cardápio
@@ -93,45 +110,72 @@ src/
 │   ├── Cart.tsx                /sacola
 │   ├── Checkout.tsx            /checkout
 │   ├── Payment.tsx             /pagamento
-│   └── Address.tsx             /endereco      mapa (carregado sob demanda)
+│   ├── Address.tsx             /endereco      mapa (sob demanda)
+│   └── admin/                  /admin/*       painel da loja
 ├── components/
 │   ├── base/                   BottomBar, AppBar, Stepper, primitives
 │   ├── store/                  StoreHero, CategoryChips, ProductRow, carrossel
-│   └── product/                OptionGroupField
+│   ├── product/                OptionGroupField
+│   ├── admin/                  AdminShell, CampoImagem, SeletorLocal
+│   └── CatalogGate.tsx         bloqueia o cliente sem cardápio carregado
 ├── store/
-│   ├── cart.tsx                carrinho, único no app e persistido
+│   ├── cart.tsx                sacola, única no app e persistida
 │   └── checkout.tsx            dados do pedido, só em memória
 ├── lib/
-│   ├── pricing.ts              todo o cálculo do pedido
-│   ├── whatsapp.ts             montagem e limpeza da comanda
-│   ├── format.ts               preço em BRL
-│   └── haptics.ts              feedback tátil
-├── data/
-│   ├── products.ts             catálogo e grupos de opções
-│   ├── config.ts               taxas, mínimo, dados da loja
-│   └── coupons.ts              cupons aceitos
+│   ├── api.ts                  leitura do catálogo e envio do pedido
+│   ├── supabase.ts             cliente completo, só para o admin
+│   ├── admin-api.ts            escritas do painel
+│   ├── pricing.ts              cálculo do pedido e da taxa por distância
+│   ├── orders.ts               chamada de create_order
+│   └── whatsapp.ts             montagem e limpeza da comanda
+├── data/catalog.ts             busca o cardápio do banco
 └── types/order.ts              tipos do domínio
 ```
 
-As rotas usam `React.lazy`. É o que mantém o Leaflet (~45 KB comprimidos) fora
-do carregamento inicial: só quem abre `/endereco` paga esse custo.
+As rotas usam `React.lazy`. É o que mantém o Leaflet (~46 KB comprimidos) e o
+`supabase-js` completo (~53 KB) fora do carregamento inicial: quem só quer pedir
+um lanche baixa 117 KB.
 
 ## Configuração
 
-Não há variáveis de ambiente. O que se ajusta fica em três arquivos:
+Tudo se ajusta pelo `/admin`, sem publicar código:
 
-- **`src/data/config.ts`** — número do WhatsApp, taxa de entrega, taxa de
-  serviço, pedido mínimo, sugestões de gorjeta e dados exibidos da loja.
-  **Os valores atuais são exemplos** e precisam ser trocados pelos reais.
-- **`src/data/products.ts`** — catálogo e grupos de personalização. Cada
-  produto precisa de `id` único e `category` correspondente a uma chave de
-  `Category`. Os grupos definem `min` e `max`: `min: 1, max: 1` vira escolha
-  única obrigatória; `min: 0` vira lista de adicionais.
-- **`src/data/coupons.ts`** — cupons, com desconto percentual, fixo ou frete
-  grátis, e subtotal mínimo.
+| Tela | O que controla |
+|---|---|
+| **Loja** | Nome, logo, banner, endereço e ponto no mapa, WhatsApp, chave Pix, taxas, pedido mínimo, gorjetas |
+| **Produtos** | Cardápio, preços, fotos, categoria, destaque, esgotado e quais grupos de opções cada item usa |
+| **Opções** | Grupos de personalização, mínimo, máximo e o acréscimo de cada escolha |
+| **Cupons** | Percentual, valor fixo ou entrega grátis, com subtotal mínimo |
+| **Pedidos** | Acompanhamento e mudança de status |
 
-Ao remover um produto ou uma opção do cardápio, sacolas salvas que os
-referenciem simplesmente descartam aquele trecho — não é preciso migrar nada.
+No código só ficam as duas variáveis de ambiente em `.env`.
+
+### Endereço da loja e retirada
+
+O endereço cadastrado aparece no cabeçalho do cardápio e na tela de checkout
+quando o cliente escolhe retirar, com link para abrir no mapa. O mesmo endereço
+vai na comanda do WhatsApp, para servir de comprovante a quem não olhou o
+cardápio.
+
+### Taxa de entrega por distância
+
+Em **Loja → Entrega e taxas** há dois modos:
+
+- **Taxa única** — o mesmo valor para toda entrega.
+- **Por distância** — `valor base + valor por km × distância`, medida em linha
+  reta entre o ponto da loja e o ponto marcado pelo cliente. Um raio máximo
+  opcional recusa pedidos além dele.
+
+A tela mostra uma simulação para 1, 3, 5 e 10 km antes de salvar.
+
+Duas consequências que valem entender:
+
+- **É distância de mapa, não de rua.** O trajeto real costuma ser 20 a 40%
+  maior; considere isso ao escolher o valor por quilômetro. Medir rota exigiria
+  uma API paga com chave.
+- **No modo por distância o ponto no mapa vira obrigatório** para entrega. Sem
+  ele não há o que medir, e cair na taxa fixa premiaria quem não marcasse. O
+  checkout avisa e leva ao mapa; o banco recusa o pedido de qualquer forma.
 
 ### Editando a comanda do WhatsApp
 
@@ -150,8 +194,7 @@ de cada preço. Ao mexer nela:
 
 `limparParaWhatsApp` é a última barreira antes do envio e remove espaços
 inseparáveis, seletores de variação e marcas invisíveis de direção que podem
-entrar por colagem no nome ou no endereço. É rede de proteção, não licença para
-reintroduzir caracteres arriscados.
+entrar por colagem no nome ou no endereço.
 
 ## Decisões de interface
 
@@ -164,60 +207,50 @@ gordura. Isso define as regras:
   de `env(safe-area-inset-*)`. Sem isso a barra fixa cai embaixo do indicador de
   gestos do iPhone e da barra de navegação do Android.
 - **A barra inferior se mede.** Sua altura muda conforme aparece o aviso de
-  pedido mínimo ou de grupo pendente, então ela publica a altura real em
-  `--bar-h` e o conteúdo reserva esse espaço. Um valor fixo deixaria a última
-  seção escondida sempre que o aviso surgisse.
-- **Alvos de toque de 44px no mínimo** em todo controle (WCAG 2.5.5). O
-  interruptor de talheres substituiu uma caixa de seleção nativa justamente
-  porque ela tem 24px e não dá para ampliar sem distorcer.
+  pedido mínimo, de grupo pendente ou de área de entrega, então ela publica a
+  altura real em `--bar-h` e o conteúdo reserva esse espaço.
+- **Alvos de toque de 44px no mínimo** em todo controle (WCAG 2.5.5).
 - **Sem depender de `hover`.** Estados de pressão usam `.press` / `.press-sm`,
   que recuam o elemento sem deslocar o layout ao redor.
-- **Botão travado explica o motivo.** Com grupo obrigatório pendente, o CTA fica
-  inerte e a faixa acima diz o que falta — e leva até lá ao ser tocada.
+- **Botão travado explica o motivo** — grupo obrigatório pendente, loja fechada,
+  fora da área de entrega — e, quando dá, leva ao que resolve.
 - **`prefers-reduced-motion`** desliga animações em laço e transformações.
-- **`h-dvh` em vez de `100vh`**, que no mobile conta a barra do navegador e
-  empurra rodapés fixos para fora da tela.
-- **Feedback tátil** só em confirmações reais, silencioso onde a API não existe.
+- **`h-dvh` em vez de `100vh`**, que no mobile conta a barra do navegador.
+- **Sem cardápio, sem pedido.** Se o banco não responde, o app mostra
+  indisponibilidade em vez de preços que podem estar velhos.
 
 ## Modelo de confiança
 
-Todo o pedido é calculado no navegador e a URL do WhatsApp é montada no próprio
-cliente. Sem servidor, **nada do que o cliente guarda pode ser tratado como
-confiável**.
+O cliente envia ao servidor **apenas identificadores e quantidades**. Nenhum
+preço, subtotal, taxa ou desconto sai do navegador.
 
-Por isso a sacola persistida em `localStorage` grava apenas identificadores:
-id do produto, ids das opções, quantidades, observação e o código do cupom.
-Preço base, nome, acréscimos das opções e valor do desconto são sempre relidos
-de `src/data/` na carga. Guardar qualquer preço permitiria editar o
-armazenamento pelo DevTools e enviar à cozinha um pedido com valor forjado.
+Todo pedido entra pela função `create_order`, que recalcula do zero a partir das
+tabelas: preço base, acréscimo de cada opção, cupom, taxa de entrega (inclusive
+por distância), taxa de serviço e pedido mínimo. A comanda do WhatsApp é montada
+do que essa função devolve. Editar o armazenamento local não muda o que a
+cozinha recebe.
 
-A leitura valida cada linha contra o catálogo:
+As permissões vivem em `supabase/rls.sql`:
 
-- o produto precisa existir;
-- o grupo precisa pertencer àquele produto;
-- a opção precisa pertencer àquele grupo e não estar esgotada;
-- a quantidade de cada opção e a soma do grupo precisam respeitar o `max`;
-- a quantidade da linha precisa ser inteira entre 1 e 99;
-- a observação é truncada;
-- o cupom é revalidado por código, inclusive o subtotal mínimo;
-- sacolas com mais de 12 horas são descartadas, porque os preços podem ter
-  mudado.
+| Quem | Catálogo, taxas, cupons | Pedidos |
+|---|---|---|
+| Visitante | apenas leitura do que está ativo | não lê e não escreve |
+| Dono autenticado | tudo | tudo |
 
-JSON inválido, campos ausentes ou armazenamento bloqueado resultam em sacola
-vazia, nunca em exceção.
+A chave publicável vai embutida no JavaScript — isso é esperado. Ela só é segura
+porque as regras acima limitam o que o visitante pode fazer. Chaves de servidor
+(`service_role`, `sb_secret_`) nunca entram no código nem em variável com
+prefixo `VITE_`.
 
-**Endereço e geolocalização não são persistidos.** Os dados do checkout vivem só
-em memória: recarregar a página perde o formulário, o que é preferível a deixar
-o endereço de alguém gravado no navegador de um aparelho possivelmente
-compartilhado.
+A sacola persistida guarda só identificadores; nome, preço e acréscimos são
+relidos do catálogo a cada carga. A leitura valida produto, grupo, opção,
+limites de quantidade e o cupom, e descarta sacolas com mais de 12 horas.
 
-**Cupons são conveniência, não defesa.** A validação é no cliente, então alguém
-determinado consegue aplicar um cupom pelo DevTools. Como o pedido passa pelo
-WhatsApp e a loja confirma na mão, um desconto indevido aparece na comanda antes
-de virar prejuízo.
+**Endereço e geolocalização do cliente não são persistidos** no navegador: os
+dados do checkout vivem só em memória.
 
-Se um dia entrar um backend, **o total precisa ser recalculado no servidor** a
-partir dos ids recebidos. A validação do cliente é conveniência, não defesa.
+**Cupons validados no cliente são conveniência, não defesa** — o desconto real é
+o que o servidor calcula ao registrar o pedido.
 
 ## Licença
 
