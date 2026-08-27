@@ -25,7 +25,8 @@ if (!supabaseConfigurado && import.meta.env.DEV) {
 
 /**
  * A chave publicável viaja em todo pedido e é visível no navegador — é assim
- * mesmo. Quem limita o que ela pode fazer é o RLS, em supabase/rls.sql.
+ * mesmo. Quem limita o que ela pode fazer é o RLS, definido na seção 6 de
+ * supabase/instalar.sql.
  */
 export const api = new PostgrestClient(`${url ?? ''}/rest/v1`, {
   headers: {

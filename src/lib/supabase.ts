@@ -8,10 +8,10 @@ import { createClient } from '@supabase/supabase-js';
  * demanda, esse peso nunca chega ao cliente que só quer pedir um lanche.
  * Para ler o cardápio e criar pedido, use `lib/api.ts`.
  *
- * A chave publicável vai embutida no JavaScript — esperado e seguro, porque
- * `supabase/rls.sql` restringe o visitante a ler o catálogo. Nenhuma chave de
- * servidor (`service_role`, `sb_secret_`) pode entrar aqui: qualquer variável
- * com prefixo VITE_ é pública.
+ * A chave publicável vai embutida no JavaScript — esperado e seguro, porque o
+ * RLS de `supabase/instalar.sql` restringe o visitante a ler o catálogo.
+ * Nenhuma chave de servidor (`service_role`, `sb_secret_`) pode entrar aqui:
+ * qualquer variável com prefixo VITE_ é pública.
  */
 const url = import.meta.env.VITE_SUPABASE_URL;
 const chave = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;

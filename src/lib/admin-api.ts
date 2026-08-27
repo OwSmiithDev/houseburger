@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabase';
 /**
  * Escrita do admin.
  *
- * Nenhuma destas funções carrega permissão própria: quem autoriza é o RLS, em
- * supabase/rls.sql. Sem sessão válida o banco recusa, mesmo que alguém force a
- * rota no navegador ou chame isto pelo console.
+ * Nenhuma destas funções carrega permissão própria: quem autoriza é o RLS,
+ * definido em supabase/instalar.sql. Sem sessão válida o banco recusa, mesmo
+ * que alguém force a rota no navegador ou chame isto pelo console.
  */
 
 const naoDeuCerto = (erro: { message: string } | null) => {

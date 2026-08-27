@@ -108,11 +108,10 @@ playwright install chromium
 
 ```
 supabase/                       scripts SQL do banco
-├── schema.sql                  tabelas, localização e taxa por distância
-├── rls.sql                     quem pode ler e escrever
-├── functions.sql               create_order e consultar_pedido
-├── reports.sql                 agregações dos relatórios de vendas
-└── seed.sql                    carga inicial do cardápio
+├── instalar.sql                banco inteiro: tabelas, funções, RLS, tempo real
+├── atualizar.sql               diferenças para uma instalação já em operação
+├── exemplo.sql                 cardápio de demonstração, para uma loja nova
+└── seed.sql                    cardápio do House Burger
 
 src/
 ├── pages/                      uma rota por arquivo
@@ -290,7 +289,7 @@ por distância), taxa de serviço e pedido mínimo. A comanda do WhatsApp é mon
 do que essa função devolve. Editar o armazenamento local não muda o que a
 cozinha recebe.
 
-As permissões vivem em `supabase/rls.sql`:
+As permissões vivem na seção 6 do `supabase/instalar.sql`:
 
 | Quem | Catálogo, taxas, cupons | Pedidos | Relatórios |
 |---|---|---|---|

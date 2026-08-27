@@ -17,14 +17,19 @@ projeto nem em variável de ambiente com prefixo `VITE_`.
 
 A única chave que o aplicativo usa é a **publicável**, e ela é pública por
 design: vai embutida no JavaScript entregue ao navegador. O que a torna segura
-é o `rls.sql` deste diretório, que limita o visitante a ler o cardápio.
+é a seção de RLS do `instalar.sql`, que limita o visitante a ler o cardápio.
 
 ---
 
 > **Este projeto já está provisionado.** Tabelas, regras de acesso, função de
 > pedido, catálogo inicial, bucket de imagens e usuário do dono já foram
-> criados. Os passos abaixo servem para recriar do zero ou montar um segundo
-> ambiente.
+> criados. Os passos abaixo servem para recriar do zero.
+>
+> Para **montar o sistema para outra empresa**, siga
+> [REPLICAR.md](REPLICAR.md).
+>
+> Para trazer uma instalação existente ao estado atual do código, rode
+> `supabase/atualizar.sql` — só aplica as diferenças, sem tocar em dados.
 
 ## 1. Criar o projeto
 
@@ -40,26 +45,25 @@ No painel, abra **SQL Editor** e execute **nesta ordem**, um de cada vez:
 
 | Ordem | Arquivo | O que faz |
 |---|---|---|
-| 1 | `supabase/schema.sql` | Cria as tabelas |
-| 2 | `supabase/rls.sql` | Define quem pode ler e escrever |
-| 3 | `supabase/functions.sql` | Cria a função que valida e registra pedidos |
-| 4 | `supabase/seed.sql` | Carrega o cardápio inicial |
+| 1 | `supabase/instalar.sql` | Tudo: tabelas, funções, RLS, tempo real e balde de imagens |
+| 2 | `supabase/seed.sql` | Carrega o cardápio do House Burger |
 
-Todos podem ser executados de novo sem estragar nada: usam `if not exists` e
-`on conflict do update`.
+Antes eram quatro arquivos colados em sequência, e errar a ordem quebrava a
+instalação. Agora é um só. Ambos podem ser executados de novo sem estragar
+nada: usam `if not exists` e `on conflict do update`.
 
 O `seed.sql` é gerado a partir dos dados que estavam no código, então o
-cardápio já entra com os 22 produtos, 7 grupos de opções e 3 cupons.
+cardápio já entra com os 22 produtos, 7 grupos de opções e 3 cupons. Para
+**outra empresa**, não use este arquivo — veja [REPLICAR.md](REPLICAR.md).
 
-## 3. Criar o bucket de imagens
+## 3. Bucket de imagens
 
-Em **Storage → New bucket**:
+O `instalar.sql` já cria o balde `midia` público e as políticas de escrita.
 
-- Nome: `midia`
-- **Public bucket: ligado** (as fotos precisam abrir para qualquer cliente)
-
-Depois, em **Storage → Policies**, permita `INSERT`, `UPDATE` e `DELETE` para
-usuários autenticados. Sem isso o envio de fotos pelo admin é recusado.
+Se ele avisar `Sem permissão para criar políticas de storage`, faça na mão em
+**Storage → New bucket**: nome `midia`, *Public bucket* ligado, e em
+**Policies** libere `INSERT`, `UPDATE` e `DELETE` para `authenticated`. Sem
+isso o envio de fotos pelo admin é recusado.
 
 ## 4. Criar o usuário do dono
 
@@ -129,8 +133,9 @@ cadastrado.
 | Sintoma | Causa provável |
 |---|---|
 | "Não foi possível carregar o cardápio" | `.env` ausente ou errado; ou os scripts não foram executados |
-| `Could not find the table` | Falta rodar `schema.sql` |
+| `Could not find the table` | Falta rodar `instalar.sql` |
 | Cardápio vazio, sem erro | Falta rodar `seed.sql` |
+| Pedido demora a aparecer no painel | `orders` fora da publicação `supabase_realtime` — rode `atualizar.sql` |
 | Login recusa a senha certa | Usuário sem *Auto Confirm* |
 | Foto não envia | Bucket `midia` não existe ou está sem política de escrita |
 | Admin salva mas nada muda | Sessão expirada — saia e entre de novo |
