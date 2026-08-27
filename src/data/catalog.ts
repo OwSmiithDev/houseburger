@@ -51,7 +51,6 @@ const buscarCatalogo = async (): Promise<Catalog> => {
     timeMax: cfg.data.tempo_max,
     serviceFeeRate: Number(cfg.data.taxa_servico),
     minOrder: Number(cfg.data.pedido_minimo),
-    tips: (cfg.data.gorjetas ?? []).map(Number),
     open: cfg.data.aberta,
 
     address: cfg.data.endereco ?? '',
@@ -136,18 +135,29 @@ const buscarCatalogo = async (): Promise<Catalog> => {
 };
 
 /**
- * O catálogo é a fonte de verdade de preços e regras, então não pode envelhecer
- * em silêncio: revalida ao voltar para a aba e ao reconectar. Uma alteração
- * feita no admin aparece para quem já estava com a página aberta.
+ * O catálogo é a fonte de verdade de preços e do estado da loja, então não pode
+ * envelhecer em silêncio.
+ *
+ * `staleTime: 0` é deliberado. Com 60 segundos, `refetchOnWindowFocus` pulava a
+ * busca sempre que a aba voltasse dentro desse intervalo — o que produzia um
+ * defeito assimétrico: fechar a loja aparecia na hora (já havia passado um
+ * minuto), mas reabrir não aparecia até recarregar a página inteira, porque o
+ * dado ainda era considerado fresco.
+ *
+ * O catálogo tem dezenas de linhas em sete tabelas; buscar de novo é barato
+ * perto de mostrar um cardápio errado.
  */
 export const useCatalog = (): UseQueryResult<Catalog, Error> =>
   useQuery({
     queryKey: CATALOG_KEY,
     queryFn: buscarCatalogo,
-    staleTime: 60_000,
+    staleTime: 0,
     retry: 2,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    refetchInterval: 30_000,
+    // Aba escondida não precisa consultar: economiza bateria e requisição.
+    refetchIntervalInBackground: false,
   });
 
 export const findProduct = (catalog: Catalog, id: string): Product | undefined =>
