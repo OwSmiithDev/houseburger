@@ -136,6 +136,10 @@ Se o pedido demorar meio minuto para aparecer no painel, a seção 7 do
 instalador não pegou — confira se a tabela `orders` está em
 **Database → Publications → supabase_realtime**.
 
+Deu tudo certo? Rode [`supabase/limpar-pedidos.sql`](../supabase/limpar-pedidos.sql)
+para o cliente receber a loja sem os pedidos da sua conferência. **Não tem
+volta** e os relatórios voltam a zero — que é justamente o que se quer aqui.
+
 ---
 
 ## O que não é replicável por SQL
@@ -168,6 +172,9 @@ Instalações novas não precisam: o `instalar.sql` já vem completo.
 - **Projeto pausado**: no plano gratuito o Supabase pausa projetos sem acesso
   por cerca de uma semana. Numa loja em operação não acontece; se acontecer,
   reative pelo painel.
+- **Zerar os pedidos**: `supabase/limpar-pedidos.sql`. Apaga todos os pedidos e
+  seus itens, sem confirmação e sem cópia; o faturamento dos relatórios vai
+  junto. Catálogo, cupons e configuração ficam intactos.
 
 ## Se der errado
 

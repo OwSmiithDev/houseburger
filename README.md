@@ -111,6 +111,7 @@ supabase/                       scripts SQL do banco
 ├── instalar.sql                banco inteiro: tabelas, funções, RLS, tempo real
 ├── atualizar.sql               diferenças para uma instalação já em operação
 ├── exemplo.sql                 cardápio de demonstração, para uma loja nova
+├── limpar-pedidos.sql          apaga todos os pedidos, sem volta
 └── seed.sql                    cardápio do House Burger
 
 src/
