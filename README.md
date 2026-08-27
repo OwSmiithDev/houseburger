@@ -18,11 +18,19 @@ Capturas do aplicativo em execução, em viewport de celular (390 × 844).
     <td align="center"><img src="docs/screenshots/03-sacola.jpg" width="200" alt="Sacola com as escolhas listadas e cupom"><br><sub><b>Sacola</b></sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/04-checkout.jpg" width="200" alt="Resumo com taxas, gorjeta e total"><br><sub><b>Checkout</b></sub></td>
+    <td align="center"><img src="docs/screenshots/04-checkout.jpg" width="200" alt="Resumo com taxas e total"><br><sub><b>Checkout</b></sub></td>
     <td align="center"><img src="docs/screenshots/05-mapa.jpg" width="200" alt="Mapa com marcador arrastável"><br><sub><b>Endereço no mapa</b></sub></td>
     <td align="center"><img src="docs/screenshots/06-admin.jpg" width="200" alt="Painel administrativo com a lista de produtos"><br><sub><b>Administração</b></sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/07-acompanhamento.jpg" width="200" alt="Linha do tempo do pedido, de Recebido a Entregue"><br><sub><b>Acompanhamento</b></sub></td>
+    <td align="center"><img src="docs/screenshots/08-relatorios.jpg" width="200" alt="Relatório de vendas com faturamento e gráfico por período"><br><sub><b>Relatórios</b></sub></td>
+    <td align="center"><img src="docs/screenshots/09-admin-desktop.jpg" width="200" alt="Painel em tela larga, com barra lateral e duas colunas de pedidos"><br><sub><b>Admin no desktop</b></sub></td>
+  </tr>
 </table>
+
+A última é em 1280 × 800: a partir de `md` o painel troca a navegação inferior
+por barra lateral.
 
 ## Como funciona
 
@@ -32,10 +40,12 @@ Capturas do aplicativo em execução, em viewport de celular (390 × 844).
    clicável, levando direto ao grupo que falta.
 3. **Sacola** — cada linha mostra o que foi escolhido, porque o mesmo produto
    com opções diferentes são pedidos diferentes. Cupom e talheres aqui.
-4. **Checkout** — retirada ou entrega, dados, gorjeta e o resumo com as contas
-   abertas: subtotal, desconto, taxa de entrega, taxa de serviço e total.
+4. **Checkout** — retirada ou entrega, dados e o resumo com as contas abertas:
+   subtotal, desconto, taxa de entrega, taxa de serviço e total.
 5. **Registro e comanda** — o pedido é gravado no banco, que recalcula os
    valores, e a comanda sai formatada para o WhatsApp da cozinha.
+6. **Acompanhamento** — logo após enviar, o cliente cai numa tela que mostra em
+   que pé está o pedido, de Recebido a Entregue, com som ao mudar de etapa.
 
 O dono acompanha os pedidos e edita o cardápio em `/admin`.
 
@@ -100,7 +110,8 @@ playwright install chromium
 supabase/                       scripts SQL do banco
 ├── schema.sql                  tabelas, localização e taxa por distância
 ├── rls.sql                     quem pode ler e escrever
-├── functions.sql               create_order, a validação do pedido
+├── functions.sql               create_order e consultar_pedido
+├── reports.sql                 agregações dos relatórios de vendas
 └── seed.sql                    carga inicial do cardápio
 
 src/
@@ -111,12 +122,14 @@ src/
 │   ├── Checkout.tsx            /checkout
 │   ├── Payment.tsx             /pagamento
 │   ├── Address.tsx             /endereco      mapa (sob demanda)
+│   ├── TrackOrder.tsx          /pedido/:token acompanhamento (sob demanda)
 │   └── admin/                  /admin/*       painel da loja
 ├── components/
 │   ├── base/                   BottomBar, AppBar, Stepper, primitives
 │   ├── store/                  StoreHero, CategoryChips, ProductRow, carrossel
 │   ├── product/                OptionGroupField
 │   ├── admin/                  AdminShell, CampoImagem, SeletorLocal
+│   ├── PedidoEmAndamento.tsx   faixa de volta ao pedido em curso
 │   └── CatalogGate.tsx         bloqueia o cliente sem cardápio carregado
 ├── store/
 │   ├── cart.tsx                sacola, única no app e persistida
@@ -127,7 +140,10 @@ src/
 │   ├── admin-api.ts            escritas do painel
 │   ├── pricing.ts              cálculo do pedido e da taxa por distância
 │   ├── orders.ts               chamada de create_order
+│   ├── imprimir.ts             comanda térmica de 80 mm
+│   ├── som.ts                  alertas sintetizados, sem arquivo de áudio
 │   └── whatsapp.ts             montagem e limpeza da comanda
+├── hooks/use-alerta-pedidos.ts contagem de pendentes e alerta de pedido novo
 ├── data/catalog.ts             busca o cardápio do banco
 └── types/order.ts              tipos do domínio
 ```
@@ -142,11 +158,12 @@ Tudo se ajusta pelo `/admin`, sem publicar código:
 
 | Tela | O que controla |
 |---|---|
-| **Loja** | Nome, logo, banner, endereço e ponto no mapa, WhatsApp, chave Pix, taxas, pedido mínimo, gorjetas |
+| **Loja** | Nome, logo, banner, endereço e ponto no mapa, WhatsApp, chave Pix, taxas, pedido mínimo |
 | **Produtos** | Cardápio, preços, fotos, categoria, destaque, esgotado e quais grupos de opções cada item usa |
 | **Opções** | Grupos de personalização, mínimo, máximo e o acréscimo de cada escolha |
 | **Cupons** | Percentual, valor fixo ou entrega grátis, com subtotal mínimo |
-| **Pedidos** | Acompanhamento e mudança de status |
+| **Pedidos** | Fila da cozinha, mudança de status e impressão da comanda |
+| **Relatórios** | Faturamento, ticket médio, cancelamentos e itens mais vendidos por período |
 
 No código só ficam as duas variáveis de ambiente em `.env`.
 
@@ -176,6 +193,49 @@ Duas consequências que valem entender:
 - **No modo por distância o ponto no mapa vira obrigatório** para entrega. Sem
   ele não há o que medir, e cair na taxa fixa premiaria quem não marcasse. O
   checkout avisa e leva ao mapa; o banco recusa o pedido de qualquer forma.
+
+### Fila da cozinha e alertas
+
+Sobre **Pedidos** fica um número em vermelho com quantos pedidos estão
+**pendentes** — a fila do que ainda não foi aceito. Assim que a cozinha marca
+"preparando", o pedido sai dessa conta.
+
+Quando entra um pedido novo, o painel toca um alerta e, se o dono autorizar pelo
+botão da faixa azul, mostra também uma notificação do sistema. O interruptor de
+som fica na barra lateral e é lembrado no aparelho.
+
+O aviso vem de duas fontes: a assinatura em tempo real do Supabase, que chega no
+instante do pedido, e uma contagem a cada 15 segundos como rede de segurança —
+WebSocket cai em rede instável, e uma cozinha não pode perder pedido por isso.
+
+> A notificação do sistema exige HTTPS e permissão do navegador. Em `localhost`
+> funciona; pelo IP da rede, não. O som e o número em vermelho cobrem esse caso.
+
+### Impressão da comanda
+
+O ícone de impressora em cada pedido abre a comanda pronta, em **80 mm** de
+bobina: fonte monoespaçada, 32 colunas, sem cor, sem imagem e sem acento —
+impressora térmica costuma trocar acento por lixo.
+
+A comanda abre numa janela própria, com folha de estilo isolada, em vez de um
+`@media print` na página do painel. Assim nenhuma classe nova em qualquer tela
+vaza para o papel. Sai também em impressora comum, ocupando uma faixa da folha.
+
+### Acompanhamento do pedido
+
+Cada pedido recebe um `token` (UUID). O cliente vai para `/pedido/<token>` logo
+após enviar, e o token fica guardado no aparelho — uma faixa no topo do cardápio
+leva de volta ao pedido em andamento.
+
+O código curto `HB-XXXX` **não** serve como chave de acesso: são 4 dígitos
+hexadecimais, 65 mil combinações, varríveis em minutos. A consulta é feita por
+uma função `security definer` que recebe o token; o visitante continua sem
+permissão de leitura na tabela `orders`.
+
+A tela consulta a cada 12 segundos enquanto estiver visível e para sozinha
+quando o pedido é entregue ou cancelado. Optei por isso em vez de WebSocket para
+não trazer o `supabase-js` completo (~53 KB comprimidos) ao pacote do cliente —
+numa hamburgueria, 12 segundos não mudam nada.
 
 ### Editando a comanda do WhatsApp
 
@@ -232,10 +292,16 @@ cozinha recebe.
 
 As permissões vivem em `supabase/rls.sql`:
 
-| Quem | Catálogo, taxas, cupons | Pedidos |
-|---|---|---|
-| Visitante | apenas leitura do que está ativo | não lê e não escreve |
-| Dono autenticado | tudo | tudo |
+| Quem | Catálogo, taxas, cupons | Pedidos | Relatórios |
+|---|---|---|---|
+| Visitante | apenas leitura do que está ativo | não lê e não escreve | não |
+| Dono autenticado | tudo | tudo | sim |
+
+O visitante alcança um pedido por dois caminhos, os dois `security definer`:
+`create_order`, para criar, e `consultar_pedido`, que devolve **um** pedido a
+quem apresentar o token dele. A tabela `orders` continua fechada, então não há
+como listar nem varrer. As funções `relatorio_*` recusam qualquer chamada sem
+sessão autenticada, antes de tocar em dado nenhum.
 
 A chave publicável vai embutida no JavaScript — isso é esperado. Ela só é segura
 porque as regras acima limitam o que o visitante pode fazer. Chaves de servidor
