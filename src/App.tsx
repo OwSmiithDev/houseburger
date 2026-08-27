@@ -18,6 +18,7 @@ const Cart = lazy(() => import("./pages/Cart"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Payment = lazy(() => import("./pages/Payment"));
 const Address = lazy(() => import("./pages/Address"));
+const TrackOrder = lazy(() => import("./pages/TrackOrder"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 /*
@@ -73,6 +74,7 @@ const App = () => (
                         <Route path="/checkout" element={<Checkout />} />
                         <Route path="/pagamento" element={<Payment />} />
                         <Route path="/endereco" element={<Address />} />
+                        <Route path="/pedido/:token" element={<TrackOrder />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </CatalogGate>

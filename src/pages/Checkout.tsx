@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -23,6 +23,8 @@ import { useCheckout } from '@/store/checkout';
 import { calcularResumo } from '@/lib/pricing';
 import { mapsUrl, montarComanda, whatsappUrl } from '@/lib/whatsapp';
 import { criarPedido } from '@/lib/orders';
+import { lembrarPedido } from '@/pages/TrackOrder';
+import { prepararSom } from '@/lib/som';
 import { formatPrice } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -58,9 +60,17 @@ const Checkout = () => {
   const foraDeArea = entrega && resumo.entrega.foraDeArea;
   const podeEnviar = settings.open && !faltaLocalizacao && !foraDeArea;
 
-  // Sacola esvaziada em outra aba, ou entrada direta pela URL.
+  /*
+   * Sacola vazia significa entrada direta pela URL ou esvaziada em outra aba —
+   * nesses casos não há o que finalizar e o cliente volta ao cardápio.
+   *
+   * A trava existe porque enviar o pedido também esvazia a sacola: sem ela,
+   * este efeito disparava logo depois do envio e atropelava a navegação para o
+   * acompanhamento, jogando o cliente de volta ao cardápio.
+   */
+  const enviado = useRef(false);
   useEffect(() => {
-    if (lines.length === 0) navigate('/', { replace: true });
+    if (lines.length === 0 && !enviado.current) navigate('/', { replace: true });
   }, [lines.length, navigate]);
 
   const limparErro = (campo: 'name' | 'address') =>
@@ -109,8 +119,16 @@ const Checkout = () => {
       toast.success(`Pedido ${pedido.codigo} registrado!`, {
         description: 'Confirme a conversa no WhatsApp.',
       });
+      // Marca antes de esvaziar: a partir daqui a sacola vazia é esperada e
+      // não deve acionar o desvio para o cardápio.
+      enviado.current = true;
       clearCart();
-      navigate('/', { replace: true });
+
+      // Este clique é o gesto que libera o áudio no navegador; sem ele o
+      // primeiro alerta de mudança de status ficaria mudo.
+      prepararSom();
+      lembrarPedido(pedido.token);
+      navigate(`/pedido/${pedido.token}`, { replace: true });
     } catch (erro) {
       aba?.close();
       haptic('warning');

@@ -3,6 +3,7 @@ import { Search, ShoppingBag, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StoreHero } from '@/components/store/StoreHero';
 import { LojaFechada } from '@/components/LojaFechada';
+import { PedidoEmAndamento } from '@/components/PedidoEmAndamento';
 import { CategoryChips } from '@/components/store/CategoryChips';
 import { FeaturedCarousel } from '@/components/store/FeaturedCarousel';
 import { ProductRow } from '@/components/store/ProductRow';
@@ -71,6 +72,7 @@ const Store = () => {
 
   return (
     <div className="min-h-dvh bg-background pb-bar">
+      <PedidoEmAndamento />
       {!settings.open && <LojaFechada />}
       <StoreHero settings={settings} />
 

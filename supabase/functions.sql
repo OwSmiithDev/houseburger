@@ -34,7 +34,6 @@ declare
   v_desconto       numeric(10,2) := 0;
   v_taxa_entrega   numeric(10,2) := 0;
   v_taxa_servico   numeric(10,2) := 0;
-  v_gorjeta        numeric(10,2) := 0;
   v_total          numeric(10,2) := 0;
   v_unit           numeric(10,2);
   v_qtd            int;
@@ -220,11 +219,7 @@ begin
 
   v_taxa_servico := round(v_subtotal * cfg.taxa_servico, 2);
 
-  -- Gorjeta é o único valor que vem do cliente, porque é escolha dele.
-  -- Ainda assim entra limitada, para um valor absurdo não poluir o histórico.
-  v_gorjeta := greatest(0, least(coalesce((payload->>'gorjeta')::numeric, 0), 200));
-
-  v_total := greatest(0, v_subtotal - v_desconto + v_taxa_entrega + v_taxa_servico + v_gorjeta);
+  v_total := greatest(0, v_subtotal - v_desconto + v_taxa_entrega + v_taxa_servico);
 
   if v_pagamento = 'cash' then
     v_troco := (payload->>'troco_para')::numeric;
@@ -235,7 +230,7 @@ begin
 
   update orders set
     subtotal = v_subtotal, desconto = v_desconto, taxa_entrega = v_taxa_entrega,
-    taxa_servico = v_taxa_servico, gorjeta = v_gorjeta, total = v_total,
+    taxa_servico = v_taxa_servico, total = v_total,
     troco_para = v_troco
   where id = v_order_id;
 
@@ -247,8 +242,9 @@ begin
       else null end,
     'subtotal', v_subtotal, 'desconto', v_desconto,
     'taxa_entrega', v_taxa_entrega, 'entrega_gratis', v_entrega_gratis,
-    'taxa_servico', v_taxa_servico, 'gorjeta', v_gorjeta,
-    'total', v_total, 'troco_para', v_troco
+    'taxa_servico', v_taxa_servico,
+    'total', v_total, 'troco_para', v_troco,
+    'token', (select token from orders where id = v_order_id)
   );
 end;
 $$;
@@ -256,3 +252,59 @@ $$;
 -- O visitante só pode chamar esta função; escrever em orders continua vedado.
 revoke all on function create_order(jsonb) from public;
 grant execute on function create_order(jsonb) to anon, authenticated;
+
+
+-- ============================================================================
+-- Consulta do pedido pelo cliente
+-- ============================================================================
+
+/*
+ * O visitante não tem permissão de leitura em `orders` — de propósito, para
+ * ninguém varrer os pedidos alheios. Esta função é a única porta, e só abre
+ * para quem tem o token uuid daquele pedido específico.
+ */
+create or replace function consultar_pedido(p_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  ped   orders%rowtype;
+  itens jsonb;
+begin
+  select * into ped from orders where token = p_token;
+  if not found then
+    raise exception 'Pedido não encontrado';
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'nome', nome, 'quantidade', quantidade,
+           'total', total, 'observacao', observacao, 'opcoes', opcoes
+         ) order by ordem), '[]'::jsonb)
+    into itens
+    from order_items where order_id = ped.id;
+
+  -- Devolve só o que o cliente precisa ver. Nada de dados internos.
+  return jsonb_build_object(
+    'codigo', ped.codigo,
+    'status', ped.status,
+    'criado_em', ped.criado_em,
+    'tipo_entrega', ped.tipo_entrega,
+    'pagamento', ped.pagamento,
+    'troco_para', ped.troco_para,
+    'endereco', ped.endereco,
+    'complemento', ped.complemento,
+    'cliente_nome', ped.cliente_nome,
+    'subtotal', ped.subtotal,
+    'desconto', ped.desconto,
+    'taxa_entrega', ped.taxa_entrega,
+    'taxa_servico', ped.taxa_servico,
+    'total', ped.total,
+    'itens', itens
+  );
+end;
+$$;
+
+revoke all on function consultar_pedido(uuid) from public;
+grant execute on function consultar_pedido(uuid) to anon, authenticated;

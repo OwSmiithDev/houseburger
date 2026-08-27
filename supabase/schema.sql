@@ -222,3 +222,21 @@ $$;
 
 grant execute on function distancia_km(numeric, numeric, numeric, numeric) to anon, authenticated;
 grant execute on function taxa_entrega_para(numeric, numeric) to anon, authenticated;
+
+-- ============================================================================
+-- Acompanhamento do pedido pelo cliente
+-- ============================================================================
+
+/*
+ * O código curto (HB-XXXX) tem 65 mil combinações: serve para a cozinha
+ * conversar sobre o pedido, não como chave de acesso — daria para varrer.
+ * O token uuid é o que autoriza o cliente a consultar o próprio pedido.
+ */
+alter table orders
+  add column if not exists token uuid not null default gen_random_uuid();
+
+create unique index if not exists orders_token_idx on orders(token);
+
+-- A gorjeta saiu do produto. A coluna em `orders` fica (histórico), mas a
+-- lista de sugestões era só configuração e pode cair.
+alter table store_settings drop column if exists gorjetas;
