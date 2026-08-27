@@ -45,7 +45,11 @@ por barra lateral.
 5. **Registro e comanda** — o pedido é gravado no banco, que recalcula os
    valores, e a comanda sai formatada para o WhatsApp da cozinha.
 6. **Acompanhamento** — logo após enviar, o cliente cai numa tela que mostra em
-   que pé está o pedido, de Recebido a Entregue, com som ao mudar de etapa.
+   que pé está o pedido, de Recebido a Entregue, com som ao mudar de etapa. Um
+   botão reenvia a comanda pelo WhatsApp, para o caso de a janela do envio ter
+   sido bloqueada.
+7. **Meus pedidos** — os pedidos anteriores ficam listados em `/meus-pedidos`,
+   guardados no próprio aparelho.
 
 O dono acompanha os pedidos e edita o cardápio em `/admin`.
 
@@ -123,6 +127,7 @@ src/
 │   ├── Payment.tsx             /pagamento
 │   ├── Address.tsx             /endereco      mapa (sob demanda)
 │   ├── TrackOrder.tsx          /pedido/:token acompanhamento (sob demanda)
+│   ├── MyOrders.tsx            /meus-pedidos  histórico local (sob demanda)
 │   └── admin/                  /admin/*       painel da loja
 ├── components/
 │   ├── base/                   BottomBar, AppBar, Stepper, primitives
@@ -140,6 +145,7 @@ src/
 │   ├── admin-api.ts            escritas do painel
 │   ├── pricing.ts              cálculo do pedido e da taxa por distância
 │   ├── orders.ts               chamada de create_order
+│   ├── historico.ts            pedidos do cliente, só no aparelho
 │   ├── imprimir.ts             comanda térmica de 80 mm
 │   ├── som.ts                  alertas sintetizados, sem arquivo de áudio
 │   └── whatsapp.ts             montagem e limpeza da comanda
@@ -158,7 +164,7 @@ Tudo se ajusta pelo `/admin`, sem publicar código:
 
 | Tela | O que controla |
 |---|---|
-| **Loja** | Nome, logo, banner, endereço e ponto no mapa, WhatsApp, chave Pix, taxas, pedido mínimo |
+| **Loja** | Nome, sigla do pedido, logo, banner, endereço e ponto no mapa, WhatsApp, chave Pix, taxas, pedido mínimo |
 | **Produtos** | Cardápio, preços, fotos, categoria, destaque, esgotado e quais grupos de opções cada item usa |
 | **Opções** | Grupos de personalização, mínimo, máximo e o acréscimo de cada escolha |
 | **Cupons** | Percentual, valor fixo ou entrega grátis, com subtotal mínimo |
@@ -166,6 +172,9 @@ Tudo se ajusta pelo `/admin`, sem publicar código:
 | **Relatórios** | Faturamento, ticket médio, cancelamentos e itens mais vendidos por período |
 
 No código só ficam as duas variáveis de ambiente em `.env`.
+
+Para montar este mesmo sistema para **outra empresa**, com banco e dados
+próprios, siga [docs/REPLICAR.md](docs/REPLICAR.md).
 
 ### Endereço da loja e retirada
 
@@ -200,13 +209,33 @@ Sobre **Pedidos** fica um número em vermelho com quantos pedidos estão
 **pendentes** — a fila do que ainda não foi aceito. Assim que a cozinha marca
 "preparando", o pedido sai dessa conta.
 
-Quando entra um pedido novo, o painel toca um alerta e, se o dono autorizar pelo
-botão da faixa azul, mostra também uma notificação do sistema. O interruptor de
-som fica na barra lateral e é lembrado no aparelho.
+Quando entra um pedido novo o painel dispara um **alarme** — sirene de duas
+notas em onda quadrada, que atravessa o barulho da chapa — e repete a cada 15
+segundos enquanto houver pedido pendente. Marcar "preparando" é o que silencia,
+não o tempo: um alarme que para sozinho vira ruído de fundo que se aprende a
+ignorar. O interruptor de som fica na barra lateral, é lembrado no aparelho e
+desliga inclusive a repetição.
+
+Se o dono autorizar pelo botão da faixa azul, sai também uma notificação do
+sistema operacional.
 
 O aviso vem de duas fontes: a assinatura em tempo real do Supabase, que chega no
-instante do pedido, e uma contagem a cada 15 segundos como rede de segurança —
+instante do pedido, e uma varredura periódica como rede de segurança —
 WebSocket cai em rede instável, e uma cozinha não pode perder pedido por isso.
+A varredura é de 10 segundos até o tempo real **entregar um evento de verdade**,
+e passa a 30 depois disso.
+
+> **O tempo real precisa ser habilitado no banco.** O Supabase só transmite
+> tabelas que estejam na publicação `supabase_realtime`, e isso não é
+> automático. Sem isso o painel assina o canal, recebe `SUBSCRIBED` e nunca
+> recebe evento nenhum — o pedido só aparece na varredura seguinte. O
+> `instalar.sql` já cuida disso; numa instalação antiga, rode o
+> `atualizar.sql`.
+>
+> Note que o estado do canal **não** serve de sinal: o servidor responde
+> `phx_reply: ok` à assinatura e só depois manda um `system` com "Unable to
+> subscribe to changes". Por isso o código só considera o tempo real ativo
+> depois de receber um evento.
 
 > A notificação do sistema exige HTTPS e permissão do navegador. Em `localhost`
 > funciona; pelo IP da rede, não. O som e o número em vermelho cobrem esse caso.
@@ -227,15 +256,36 @@ Cada pedido recebe um `token` (UUID). O cliente vai para `/pedido/<token>` logo
 após enviar, e o token fica guardado no aparelho — uma faixa no topo do cardápio
 leva de volta ao pedido em andamento.
 
-O código curto `HB-XXXX` **não** serve como chave de acesso: são 4 dígitos
-hexadecimais, 65 mil combinações, varríveis em minutos. A consulta é feita por
-uma função `security definer` que recebe o token; o visitante continua sem
-permissão de leitura na tabela `orders`.
+O código curto (`HB-4F2A`, com a sigla vinda da configuração da loja) **não**
+serve como chave de acesso: são 4 dígitos hexadecimais, 65 mil combinações,
+varríveis em minutos. A consulta é feita por uma função `security definer` que
+recebe o token; o visitante continua sem permissão de leitura na tabela
+`orders`.
 
 A tela consulta a cada 12 segundos enquanto estiver visível e para sozinha
 quando o pedido é entregue ou cancelado. Optei por isso em vez de WebSocket para
 não trazer o `supabase-js` completo (~53 KB comprimidos) ao pacote do cliente —
 numa hamburgueria, 12 segundos não mudam nada.
+
+Um botão **reenvia a comanda pelo WhatsApp**. Abrir a conversa depende de uma
+aba nova, e nenhum navegador garante isso: bloqueador de pop-up, aba fechada sem
+querer, WhatsApp não instalado. Sem uma segunda porta, o pedido ficaria
+registrado no banco sem a cozinha saber. A mensagem é remontada a partir do que
+o servidor devolve, não de algo guardado no aparelho.
+
+### Meus pedidos, e o que fica no aparelho
+
+`/meus-pedidos` lista os pedidos anteriores. Sem login não há como o servidor
+saber quem é quem, então a lista mora no `localStorage` — o registro do que foi
+vendido continua inteiro no banco, que é de onde o painel sabe quem pediu o quê.
+
+Guarda o mínimo para montar a lista e reabrir o acompanhamento: token, código,
+data, total, tipo de entrega e quantidade de itens. **Nome, endereço e
+coordenadas não entram.** Quem precisa deles busca no servidor apresentando o
+token.
+
+Trocar de aparelho ou limpar os dados do site apaga o histórico local; nenhum
+pedido é cancelado por isso.
 
 ### Editando a comanda do WhatsApp
 
@@ -313,7 +363,10 @@ relidos do catálogo a cada carga. A leitura valida produto, grupo, opção,
 limites de quantidade e o cupom, e descarta sacolas com mais de 12 horas.
 
 **Endereço e geolocalização do cliente não são persistidos** no navegador: os
-dados do checkout vivem só em memória.
+dados do checkout vivem só em memória. O histórico de `/meus-pedidos` é a única
+coisa que fica gravada, e guarda apenas token, código, data, total, tipo de
+entrega e quantidade de itens — nada que identifique a pessoa ou o lugar. Quem
+quiser o endereço de volta busca no servidor com o token.
 
 **Cupons validados no cliente são conveniência, não defesa** — o desconto real é
 o que o servidor calcula ao registrar o pedido.
