@@ -16,7 +16,7 @@ import { useCatalog } from '@/data/catalog';
 import { registrarConsulta } from '@/lib/historico';
 import { montarComanda, whatsappUrl, type DadosComanda } from '@/lib/whatsapp';
 import { formatPrice } from '@/lib/format';
-import { somStatus } from '@/lib/som';
+import { destravarSomNoPrimeiroToque, somStatus } from '@/lib/som';
 import { haptic } from '@/lib/haptics';
 import { paymentLabels, type PaymentMethod } from '@/types/order';
 import { AppBar } from '@/components/base/AppBar';
@@ -62,6 +62,17 @@ const TrackOrder = () => {
     refetchIntervalInBackground: false,
     retry: 2,
   });
+
+  /*
+   * Destrava o áudio no primeiro toque desta tela.
+   *
+   * Quem acabou de enviar o pedido já passou por um gesto no checkout, mas
+   * quem volta pela faixa do cardápio, por link ou recarregando a página não
+   * passou — e o navegador mantém o áudio bloqueado até haver um. Sem isto a
+   * mudança de status chegaria muda justamente para quem deixou a tela aberta
+   * esperando.
+   */
+  useEffect(() => destravarSomNoPrimeiroToque(), []);
 
   // Avisa só quando o status MUDA. Na primeira carga apenas registra, senão o
   // cliente ouviria um alerta ao abrir a tela sem nada ter acontecido.

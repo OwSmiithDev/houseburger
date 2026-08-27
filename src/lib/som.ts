@@ -60,12 +60,18 @@ interface Nota {
   duracao: number;
   tipo?: OscillatorType;
   volume?: number;
+  /**
+   * `bloco` mantém o volume e corta no fim — serve a alarme, que precisa de
+   * presença constante. `sino` ataca e decai o tempo todo, como um objeto que
+   * foi percutido; é o que soa musical em vez de eletrônico.
+   */
+  envelope?: 'bloco' | 'sino';
 }
 
 const tocarNota = (
   ctx: AudioContext,
   destino: AudioNode,
-  { hz, inicio, duracao, tipo = 'sine', volume = 0.18 }: Nota,
+  { hz, inicio, duracao, tipo = 'sine', volume = 0.18, envelope = 'bloco' }: Nota,
 ) => {
   const osc = ctx.createOscillator();
   const ganho = ctx.createGain();
@@ -73,10 +79,12 @@ const tocarNota = (
   osc.frequency.value = hz;
 
   const t = ctx.currentTime + inicio;
-  // Envelope curto: sem o fade o corte seco estala no alto-falante.
+  // Sem o fade de entrada o corte seco estala no alto-falante.
   ganho.gain.setValueAtTime(0, t);
   ganho.gain.linearRampToValueAtTime(volume, t + 0.008);
-  ganho.gain.setValueAtTime(volume, t + duracao - 0.02);
+  if (envelope === 'bloco') {
+    ganho.gain.setValueAtTime(volume, t + duracao - 0.02);
+  }
   ganho.gain.exponentialRampToValueAtTime(0.001, t + duracao);
 
   osc.connect(ganho).connect(destino);
@@ -114,16 +122,46 @@ export const somPedidoNovo = () => {
 };
 
 /**
- * Nota única e curta: o status do pedido mudou.
+ * O status do pedido mudou — sino ascendente para o cliente.
  *
- * Continua senoidal e discreta de propósito — quem ouve é o cliente esperando
- * o lanche, e ali o objetivo é avisar, não alarmar.
+ * Eram duas notas senoidais curtas e baixas, que soavam mais a bipe de
+ * eletrodoméstico do que a boa notícia. Agora é um arpejo de lá maior em onda
+ * triangular, com envelope de sino: cada nota decai enquanto a seguinte entra,
+ * então as três soam juntas e o acorde se forma.
+ *
+ * A triangular tem harmônicos suficientes para o som ter corpo no alto-falante
+ * de celular, sem a aspereza da quadrada do alarme da cozinha — aqui quem ouve
+ * é o cliente esperando o lanche, e o objetivo é avisar, não alarmar.
+ *
+ * O volume dobra em relação ao anterior (0,18 para 0,38) e uma oitava acima,
+ * bem discreta, dá o brilho que faz o som se destacar sem precisar de mais
+ * ganho.
  */
 export const somStatus = () => {
   const c = obterContexto();
   if (!c) return;
-  tocarNota(c.ctx, c.destino, { hz: 660, inicio: 0, duracao: 0.12 });
-  tocarNota(c.ctx, c.destino, { hz: 990, inicio: 0.13, duracao: 0.18 });
+  const { ctx, destino } = c;
+
+  // Lá maior ascendente: A5, C#6, E6.
+  const NOTAS = [880, 1108.73, 1318.51];
+  NOTAS.forEach((hz, i) => {
+    tocarNota(ctx, destino, {
+      hz,
+      inicio: i * 0.11,
+      duracao: 0.75 - i * 0.06,
+      tipo: 'triangle',
+      volume: 0.38,
+      envelope: 'sino',
+    });
+    tocarNota(ctx, destino, {
+      hz: hz * 2,
+      inicio: i * 0.11,
+      duracao: 0.3,
+      tipo: 'sine',
+      volume: 0.1,
+      envelope: 'sino',
+    });
+  });
 };
 
 /**
