@@ -144,31 +144,39 @@ const Address = () => {
           <TocarParaMover onMove={mover} />
         </MapContainer>
 
-        <button
-          type="button"
-          onClick={() => mapRef.current?.setView(pos, mapRef.current.getZoom())}
-          aria-label="Centralizar no marcador"
-          className="press absolute bottom-20 right-4 z-[500] flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised"
-        >
-          <LocateFixed className="h-5 w-5 text-foreground" aria-hidden="true" />
-        </button>
+        {/* Ancorados pela altura real da barra, não por um valor fixo: a barra é
+            `fixed` e não ocupa espaço no fluxo, então o mapa se estende por
+            baixo dela. Com `bottom-4` os dois botões caíam atrás da faixa, e o
+            de GPS ficava bem em cima do "Confirmar local" — tocar nele
+            confirmava o endereço errado. A faixa muda de altura conforme o
+            texto quebra, e --bar-h é medido pela própria BottomBar. */}
+        <div className="acima-da-barra pointer-events-none absolute right-4 z-[500] flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => mapRef.current?.setView(pos, mapRef.current.getZoom())}
+            aria-label="Centralizar no marcador"
+            className="press pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised"
+          >
+            <LocateFixed className="h-5 w-5 text-foreground" aria-hidden="true" />
+          </button>
 
-        <button
-          type="button"
-          onClick={usarGps}
-          disabled={buscandoGps}
-          aria-label="Usar minha localização atual"
-          className="press absolute bottom-4 right-4 z-[500] flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised disabled:opacity-70"
-        >
-          {buscandoGps ? (
-            <span
-              className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
-              aria-hidden="true"
-            />
-          ) : (
-            <Crosshair className="h-5 w-5 text-primary" aria-hidden="true" />
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={usarGps}
+            disabled={buscandoGps}
+            aria-label="Usar minha localização atual"
+            className="press pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised disabled:opacity-70"
+          >
+            {buscandoGps ? (
+              <span
+                className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                aria-hidden="true"
+              />
+            ) : (
+              <Crosshair className="h-5 w-5 text-primary" aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </div>
 
       <BottomBar

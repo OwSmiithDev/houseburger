@@ -230,6 +230,14 @@
     padding-bottom: calc(var(--bar-h, calc(var(--bar) + var(--safe-bottom))) + 1rem);
   }
 
+  /* Ancora um elemento flutuante logo acima da barra fixa.
+     A barra não ocupa espaço no fluxo, então um `bottom-4` num mapa que vai
+     até o fim da tela cai por baixo dela — foi o que escondeu os botões do
+     mapa de endereço, com o de GPS parando exatamente sobre o "Confirmar". */
+  .acima-da-barra {
+    bottom: calc(var(--bar-h, calc(var(--bar) + var(--safe-bottom))) + 1rem);
+  }
+
   .animate-slide-up {
     animation: slide-up 0.35s cubic-bezier(0.2, 0, 0.2, 1);
   }
