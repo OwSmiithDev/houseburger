@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { CampoImagem } from '@/components/admin/CampoImagem';
 import { Pill } from '@/components/base/primitives';
+import { Switch } from '@/components/base/Switch';
 import {
   alternarProduto,
   definirGruposDoProduto,
@@ -18,6 +19,7 @@ import {
 } from '@/lib/admin-api';
 import { CATALOG_KEY } from '@/data/catalog';
 import { formatPrice } from '@/lib/format';
+import { CampoNumero } from '@/components/base/CampoNumero';
 import { cn } from '@/lib/utils';
 
 const vazio = (categoriaId: string, ordem: number): ProdutoAdmin => ({
@@ -155,14 +157,13 @@ const Products = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="preco" className="mb-1 block text-sm font-bold text-foreground">Preço</label>
-              <input
+              <CampoNumero
                 id="preco"
-                type="number"
                 step="0.01"
                 min="0"
                 required
                 value={editando.preco}
-                onChange={(e) => setEditando({ ...editando, preco: Number(e.target.value) })}
+                onChange={(v) => setEditando({ ...editando, preco: v })}
                 className={campo}
               />
             </div>
@@ -289,46 +290,48 @@ const Products = () => {
                   {!p.ativo && <Pill tone="neutral">Inativo</Pill>}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditando(p as unknown as ProdutoAdmin)}
-                aria-label={`Editar ${p.nome}`}
-                className="press-sm tap-target flex items-center justify-center rounded-full text-muted-foreground"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </button>
+              {/* Editar e excluir são as duas ações sobre o item e ficam
+                  juntas. A lixeira estava lá embaixo num `flex-wrap` com
+                  `ml-auto`: os botões enchiam a linha, ela quebrava, e sobrava
+                  um vão enorme antes do ícone. */}
+              <div className="flex shrink-0 items-center">
+                <button
+                  type="button"
+                  onClick={() => setEditando(p as unknown as ProdutoAdmin)}
+                  aria-label={`Editar ${p.nome}`}
+                  className="press-sm tap-target flex items-center justify-center rounded-full text-muted-foreground"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Remover "${p.nome}" do cardápio?`)) excluir.mutate(p.id);
+                  }}
+                  aria-label={`Remover ${p.nome}`}
+                  className="press-sm tap-target flex items-center justify-center rounded-full text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-2 border-t border-border pt-2">
+            <div className="mt-1 flex flex-wrap items-center gap-x-5 border-t border-border pt-1">
               {([
                 ['esgotado', p.esgotado, 'Esgotado'],
                 ['destaque', p.destaque, 'Destaque'],
                 ['ativo', p.ativo, 'Ativo'],
               ] as const).map(([campoNome, valor, rotulo]) => (
-                <button
+                <Switch
                   key={campoNome}
-                  type="button"
-                  onClick={() =>
-                    alternar.mutate({ id: p.id, campo: campoNome, valor: !valor })
+                  checked={valor}
+                  onCheckedChange={(v) =>
+                    alternar.mutate({ id: p.id, campo: campoNome, valor: v })
                   }
-                  className={cn(
-                    'press-sm h-11 rounded-lg px-3 text-xs font-bold',
-                    valor ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {rotulo}: {valor ? 'sim' : 'não'}
-                </button>
+                  label={rotulo}
+                  disabled={alternar.isPending}
+                />
               ))}
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm(`Remover "${p.nome}" do cardápio?`)) excluir.mutate(p.id);
-                }}
-                aria-label={`Remover ${p.nome}`}
-                className="press-sm ml-auto flex h-11 w-11 items-center justify-center rounded-lg text-destructive"
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
             </div>
           </div>
         ))}
