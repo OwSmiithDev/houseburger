@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Pill } from '@/components/base/primitives';
 import { listarPedidos, mudarStatus, type StatusPedido } from '@/lib/admin-api';
+import { intervaloVarredura, useAlerta } from '@/hooks/use-alerta-pedidos';
 import { formatPrice } from '@/lib/format';
 import { paymentLabels, type PaymentMethod } from '@/types/order';
 import { mapsUrl } from '@/lib/whatsapp';
@@ -59,12 +60,23 @@ const Orders = () => {
     }
   };
 
+  const { tempoRealAtivo } = useAlerta();
+
   const pedidos = useQuery({
     queryKey: ['admin', 'pedidos'],
     queryFn: () => listarPedidos(100),
-    // A cozinha deixa esta tela aberta; sem isto um pedido novo só apareceria
-    // ao recarregar a página na mão.
-    refetchInterval: 30_000,
+    /*
+     * A cozinha deixa esta tela aberta o serviço inteiro, então ela precisa se
+     * atualizar sozinha. O caminho rápido é a assinatura em tempo real, que
+     * invalida esta consulta assim que um pedido entra; a varredura abaixo é a
+     * rede de segurança, e por isso acelera para 10s quando o tempo real não
+     * está de pé. Com 30s fixos um pedido pago ficava meio minuto invisível.
+     */
+    refetchInterval: intervaloVarredura(tempoRealAtivo),
+    // Declarado, e não herdado do padrão do React Query: voltar para a aba
+    // precisa mostrar o que chegou enquanto ela estava em segundo plano.
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const atualizar = useMutation({
