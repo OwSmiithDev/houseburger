@@ -18,12 +18,16 @@ export const Switch = ({
   label,
   disabled,
   className,
+  'aria-label': ariaLabel,
 }: {
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
+  /** Vazio quando a linha já diz o que o interruptor controla; nesse caso
+   *  passe `aria-label`, senão o leitor de tela anuncia só "ligado". */
   label: string;
   disabled?: boolean;
   className?: string;
+  'aria-label'?: string;
 }) => (
   <label
     className={cn(
@@ -36,6 +40,7 @@ export const Switch = ({
       checked={checked}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
+      aria-label={label || ariaLabel}
       className={cn(
         'peer relative h-6 w-11 shrink-0 rounded-full transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
@@ -49,13 +54,15 @@ export const Switch = ({
         )}
       />
     </SwitchPrimitive.Root>
-    <span
-      className={cn(
-        'text-xs font-bold',
-        checked ? 'text-foreground' : 'text-muted-foreground',
-      )}
-    >
-      {label}
-    </span>
+    {label && (
+      <span
+        className={cn(
+          'text-xs font-bold',
+          checked ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {label}
+      </span>
+    )}
   </label>
 );

@@ -1,19 +1,36 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Apple,
   Beef,
+  Beer,
   Cake,
+  Candy,
+  Carrot,
+  CherryIcon,
   Citrus,
   Coffee,
+  Cookie,
+  Croissant,
   CupSoda,
   Drumstick,
+  EggFried,
+  Fish,
   Flame,
+  Grape,
+  Ham,
   IceCreamCone,
+  Leaf,
+  Martini,
+  Milk,
   Pizza,
   Popcorn,
   Salad,
   Sandwich,
+  Shell,
   Soup,
   UtensilsCrossed,
+  Wheat,
+  Wine,
 } from 'lucide-react';
 
 /** Uma escolha dentro de um grupo. O acréscimo pode ser zero ou negativo. */
@@ -166,21 +183,47 @@ export interface CustomerData {
  * O banco guarda o nome; o mapa resolve para o componente. Nome desconhecido
  * cai num padrão neutro em vez de quebrar a tela.
  */
+/*
+ * Ícones oferecidos ao dono da loja na hora de criar uma categoria.
+ *
+ * Um mapa fixo, e não `lucide-react` inteiro: importar a biblioteca toda pelo
+ * nome traria mais de mil ícones para o pacote do cliente, que hoje pesa 117 KB.
+ *
+ * A lista cobre nichos além de hamburgueria — pizzaria, japonês, padaria,
+ * cafeteria, adega — porque o mesmo sistema é instalado para lojas diferentes.
+ */
 const icones: Record<string, LucideIcon> = {
+  Apple,
   Beef,
+  Beer,
   Cake,
+  Candy,
+  Carrot,
+  Cherry: CherryIcon,
   Citrus,
   Coffee,
+  Cookie,
+  Croissant,
   CupSoda,
   Drumstick,
+  EggFried,
+  Fish,
   Flame,
+  Grape,
+  Ham,
   IceCreamCone,
+  Leaf,
+  Martini,
+  Milk,
   Pizza,
   Popcorn,
   Salad,
   Sandwich,
+  Shell,
   Soup,
   UtensilsCrossed,
+  Wheat,
+  Wine,
 };
 
 export const nomesDeIcone = Object.keys(icones);

@@ -35,6 +35,7 @@ const AdminGroups = lazy(() => import("./pages/admin/Groups"));
 const AdminCoupons = lazy(() => import("./pages/admin/Coupons"));
 const AdminStore = lazy(() => import("./pages/admin/StoreSettings"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
+const AdminCategories = lazy(() => import("./pages/admin/Categories"));
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
                 <Route path="/admin/cupons" element={<AdminCoupons />} />
                 <Route path="/admin/loja" element={<AdminStore />} />
                 <Route path="/admin/relatorios" element={<AdminReports />} />
+                <Route path="/admin/categorias" element={<AdminCategories />} />
 
                 {/* Cliente: nada renderiza sem catálogo carregado. */}
                 <Route

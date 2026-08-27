@@ -182,6 +182,28 @@ export const salvarCategoria = async (c: {
   naoDeuCerto(error);
 };
 
+/**
+ * Quantos produtos usam cada categoria.
+ *
+ * Serve para a tela recusar a exclusão de uma categoria que ainda tem itens.
+ * A chave estrangeira é `on delete set null`, então o banco deixaria excluir e
+ * os produtos ficariam órfãos — sumiriam da navegação sem ninguém perceber.
+ */
+export const contarProdutosPorCategoria = async () => {
+  const { data, error } = await supabase.from('products').select('category_id');
+  naoDeuCerto(error);
+  const contagem = new Map<string, number>();
+  for (const { category_id } of data ?? []) {
+    if (category_id) contagem.set(category_id, (contagem.get(category_id) ?? 0) + 1);
+  }
+  return contagem;
+};
+
+export const removerCategoria = async (id: string) => {
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  naoDeuCerto(error);
+};
+
 // ------------------------------------------------------------------- cupons
 export const listarCupons = async () => {
   const { data, error } = await supabase.from('coupons').select('*').order('codigo');
