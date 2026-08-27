@@ -19,11 +19,10 @@ const iconeMarcador = L.divIcon({
   iconAnchor: [16, 32],
 });
 
-const SeguirCentro = ({ onMove }: { onMove: (lat: number, lng: number) => void }) => {
+const TocarParaMover = ({ onMove }: { onMove: (lat: number, lng: number) => void }) => {
   useMapEvents({
-    moveend(e) {
-      const c = e.target.getCenter();
-      onMove(Number(c.lat.toFixed(6)), Number(c.lng.toFixed(6)));
+    click(e) {
+      onMove(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)));
     },
   });
   return null;
@@ -89,11 +88,13 @@ export const SeletorLocal = ({
         Local da loja no mapa
       </span>
       <p className="mb-2 text-xs text-muted-foreground">
-        Arraste o mapa até a porta da loja. Este ponto aparece para quem vai
+        Arraste o pino ou toque no mapa até a porta da loja. Este ponto aparece para quem vai
         retirar e é a origem do cálculo da taxa por quilômetro.
       </p>
 
-      <div className="relative h-56 overflow-hidden rounded-xl border border-border">
+      {/* Mesmo motivo do mapa do cliente: contexto proprio para os paineis do
+          Leaflet nao escaparem por cima do resto da pagina. */}
+      <div className="relative z-0 isolate h-56 overflow-hidden rounded-xl border border-border">
         <MapContainer
           center={inicial}
           zoom={definido ? 17 : 13}
@@ -105,8 +106,19 @@ export const SeletorLocal = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <Marker position={inicial} icon={iconeMarcador} />
-          <SeguirCentro onMove={onChange} />
+          <Marker
+            position={inicial}
+            icon={iconeMarcador}
+            draggable
+            autoPan
+            eventHandlers={{
+              dragend: (e) => {
+                const { lat, lng } = e.target.getLatLng();
+                onChange(Number(lat.toFixed(6)), Number(lng.toFixed(6)));
+              },
+            }}
+          />
+          <TocarParaMover onMove={onChange} />
         </MapContainer>
 
         <button
@@ -114,7 +126,7 @@ export const SeletorLocal = ({
           onClick={usarGps}
           disabled={buscando}
           aria-label="Usar minha localização atual"
-          className="press absolute bottom-3 right-3 z-[1000] flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-raised disabled:opacity-70"
+          className="press absolute bottom-3 right-3 z-[500] flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-raised disabled:opacity-70"
         >
           {buscando ? (
             <span

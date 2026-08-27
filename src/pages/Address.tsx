@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Crosshair, Info, MapPin } from 'lucide-react';
+import { Crosshair, Info, LocateFixed, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppBar } from '@/components/base/AppBar';
 import { BarButton, BottomBar } from '@/components/base/BottomBar';
@@ -28,12 +28,16 @@ const iconeMarcador = L.divIcon({
   iconAnchor: [16, 32],
 });
 
-/** Arrastar o mapa move o pino, como nas referências. */
-const SeguirCentro = ({ onMove }: { onMove: (lat: number, lng: number) => void }) => {
+/**
+ * Tocar no mapa move o pino para ali.
+ *
+ * Complementa o arraste do proprio marcador: em tela pequena acertar o
+ * marcador com o dedo e dificil, e um toque no destino resolve.
+ */
+const TocarParaMover = ({ onMove }: { onMove: (lat: number, lng: number) => void }) => {
   useMapEvents({
-    moveend(e) {
-      const c = e.target.getCenter();
-      onMove(c.lat, c.lng);
+    click(e) {
+      onMove(e.latlng.lat, e.latlng.lng);
     },
   });
   return null;
@@ -108,7 +112,11 @@ const Address = () => {
     <div className="flex h-dvh flex-col bg-background">
       <AppBar title="Marcar no mapa" fallback="/checkout" />
 
-      <div className="relative flex-1">
+      {/* isolate + z-0: o Leaflet posiciona seus paineis em z-index 400. Sem um
+          contexto de empilhamento proprio eles competem no nivel global e
+          cobrem a BottomBar (z-40) — era por isso que o botao Confirmar nao
+          aparecia. */}
+      <div className="relative z-0 isolate flex-1">
         <MapContainer
           center={inicial}
           zoom={16}
@@ -120,16 +128,37 @@ const Address = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <Marker position={pos} icon={iconeMarcador} />
-          <SeguirCentro onMove={mover} />
+          <Marker
+            position={pos}
+            icon={iconeMarcador}
+            draggable
+            autoPan
+            eventHandlers={{
+              dragend: (e) => {
+                const { lat, lng } = e.target.getLatLng();
+                mover(lat, lng);
+                haptic('light');
+              },
+            }}
+          />
+          <TocarParaMover onMove={mover} />
         </MapContainer>
+
+        <button
+          type="button"
+          onClick={() => mapRef.current?.setView(pos, mapRef.current.getZoom())}
+          aria-label="Centralizar no marcador"
+          className="press absolute bottom-20 right-4 z-[500] flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised"
+        >
+          <LocateFixed className="h-5 w-5 text-foreground" aria-hidden="true" />
+        </button>
 
         <button
           type="button"
           onClick={usarGps}
           disabled={buscandoGps}
           aria-label="Usar minha localização atual"
-          className="press absolute bottom-4 right-4 z-[1000] flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised disabled:opacity-70"
+          className="press absolute bottom-4 right-4 z-[500] flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-raised disabled:opacity-70"
         >
           {buscandoGps ? (
             <span
@@ -149,7 +178,7 @@ const Address = () => {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-foreground">Não é sua localização?</p>
               <p className="text-xs text-muted-foreground">
-                Arraste o mapa até a sua rua para facilitar a entrega.
+                Arraste o pino ou toque no mapa para marcar o ponto exato.
               </p>
             </div>
           </div>
