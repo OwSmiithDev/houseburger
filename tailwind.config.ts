@@ -54,6 +54,27 @@ export default {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
         },
+        // Faixas de aviso: fundo solido claro + texto escuro proprio.
+        aviso: {
+          DEFAULT: "hsl(var(--aviso))",
+          foreground: "hsl(var(--aviso-foreground))",
+          border: "hsl(var(--aviso-border))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+          border: "hsl(var(--info-border))",
+        },
+        alerta: {
+          DEFAULT: "hsl(var(--alerta))",
+          foreground: "hsl(var(--alerta-foreground))",
+          border: "hsl(var(--alerta-border))",
+        },
+        economia: {
+          DEFAULT: "hsl(var(--economia))",
+          foreground: "hsl(var(--economia-foreground))",
+          border: "hsl(var(--economia-border))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

@@ -11,12 +11,12 @@ import { Clock } from 'lucide-react';
 export const LojaFechada = () => (
   <div
     role="status"
-    className="flex items-start gap-3 border-b border-secondary/30 bg-secondary/15 px-4 py-3"
+    className="flex items-start gap-3 border-b border-aviso-border bg-aviso px-4 py-3 text-aviso-foreground"
   >
-    <Clock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
+    <Clock className="mt-0.5 h-5 w-5 shrink-0 text-aviso-foreground" aria-hidden="true" />
     <div className="min-w-0">
-      <p className="text-sm font-bold text-foreground">Estamos fechados agora</p>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm font-bold">Estamos fechados agora</p>
+      <p className="text-xs opacity-80">
         Você pode ver o cardápio, mas não é possível fazer pedidos no momento.
       </p>
     </div>

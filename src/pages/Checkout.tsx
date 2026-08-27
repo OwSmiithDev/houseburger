@@ -435,7 +435,7 @@ const Checkout = () => {
           foraDeArea ? (
             <div
               role="alert"
-              className="flex items-center gap-2 border-t border-destructive/25 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive"
+              className="flex items-center gap-2 border-t border-alerta-border bg-alerta px-4 py-2 text-sm font-semibold text-alerta-foreground"
             >
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
               Fora da área de entrega ({resumo.entrega.distancia} km, limite{' '}
@@ -445,9 +445,9 @@ const Checkout = () => {
             <button
               type="button"
               onClick={() => navigate('/endereco')}
-              className="press flex w-full items-center gap-2 border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-left text-sm font-semibold text-foreground"
+              className="press flex w-full items-center gap-2 border-t border-aviso-border bg-aviso px-4 py-2 text-left text-sm font-semibold text-aviso-foreground"
             >
-              <Navigation className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+              <Navigation className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 Marque o local no mapa para calcularmos a entrega
               </span>

@@ -170,18 +170,18 @@ const Product = () => {
           lojaFechada ? (
             <div
               role="status"
-              className="flex items-center gap-2 border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-sm font-semibold text-foreground"
+              className="flex items-center gap-2 border-t border-aviso-border bg-aviso px-4 py-2 text-sm font-semibold text-aviso-foreground"
             >
-              <Clock className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+              <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
               Estamos fechados: não é possível pedir agora
             </div>
           ) : pendentes.length > 0 ? (
             <button
               type="button"
               onClick={irParaPendente}
-              className="press flex w-full items-center gap-2 border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-left text-sm font-semibold text-foreground"
+              className="press flex w-full items-center gap-2 border-t border-aviso-border bg-aviso px-4 py-2 text-left text-sm font-semibold text-aviso-foreground"
             >
-              <AlertCircle className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate">
                 Falta escolher: {pendentes.map((g) => g.name).join(', ')}
               </span>

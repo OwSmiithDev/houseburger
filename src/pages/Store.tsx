@@ -154,7 +154,7 @@ const Store = () => {
         <BottomBar
           above={
             !resumo.atingiuMinimo ? (
-              <div className="bg-success/12 border-t border-success/25 px-4 py-2 text-center text-sm font-semibold text-success">
+              <div className="border-t border-economia-border bg-economia px-4 py-2 text-center text-sm font-semibold text-economia-foreground">
                 Faltam {formatPrice(resumo.faltaParaMinimo)} para o pedido mínimo de{' '}
                 {formatPrice(settings.minOrder)}
               </div>

@@ -272,12 +272,12 @@ const Cart = () => {
           !catalog.settings.open ? (
             <div
               role="status"
-              className="border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-center text-sm font-semibold text-foreground"
+              className="border-t border-aviso-border bg-aviso px-4 py-2 text-center text-sm font-semibold text-aviso-foreground"
             >
               Estamos fechados: não é possível finalizar agora
             </div>
           ) : !resumo.atingiuMinimo ? (
-            <div className="border-t border-secondary/30 bg-secondary/15 px-4 py-2 text-center text-sm font-semibold text-foreground">
+            <div className="border-t border-aviso-border bg-aviso px-4 py-2 text-center text-sm font-semibold text-aviso-foreground">
               Faltam {formatPrice(resumo.faltaParaMinimo)} para o mínimo de{' '}
               {formatPrice(catalog.settings.minOrder)}
             </div>
