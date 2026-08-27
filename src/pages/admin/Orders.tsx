@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MapPin, Phone } from 'lucide-react';
+import { ChevronDown, MapPin, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Pill } from '@/components/base/primitives';
@@ -8,6 +8,8 @@ import { listarPedidos, mudarStatus, type StatusPedido } from '@/lib/admin-api';
 import { formatPrice } from '@/lib/format';
 import { paymentLabels, type PaymentMethod } from '@/types/order';
 import { mapsUrl } from '@/lib/whatsapp';
+import { imprimirComanda, type PedidoImpressao } from '@/lib/imprimir';
+import { lerConfiguracao } from '@/lib/admin-api';
 import { cn } from '@/lib/utils';
 
 const fluxo: StatusPedido[] = ['pendente', 'preparando', 'saiu', 'entregue'];
@@ -40,6 +42,18 @@ const Orders = () => {
   const qc = useQueryClient();
   const [aberto, setAberto] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<StatusPedido | 'todos'>('todos');
+
+  const config = useQuery({ queryKey: ['admin', 'config'], queryFn: lerConfiguracao });
+
+  const imprimir = (p: PedidoImpressao) => {
+    try {
+      imprimirComanda(p, config.data?.nome ?? 'House Burger');
+    } catch (e) {
+      toast.error('Não foi possível abrir a impressão', {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  };
 
   const pedidos = useQuery({
     queryKey: ['admin', 'pedidos'],
@@ -92,38 +106,53 @@ const Orders = () => {
 
           return (
             <article key={p.id} className="surface overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setAberto(expandido ? null : p.id)}
-                aria-expanded={expandido}
-                className="press-sm flex w-full items-center gap-3 p-4 text-left"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="text-sm font-black text-foreground">{p.codigo}</span>
-                    <Pill className={corStatus[status]}>{rotuloStatus[status]}</Pill>
+              {/* Duas ações lado a lado: expandir e imprimir. Botões irmãos, não
+                  aninhados — botão dentro de botão é HTML inválido e o clique da
+                  impressora acabava caindo no acordeão. */}
+              <div className="flex items-stretch">
+                <button
+                  type="button"
+                  onClick={() => setAberto(expandido ? null : p.id)}
+                  aria-expanded={expandido}
+                  className="press-sm flex min-w-0 flex-1 items-center gap-3 p-4 text-left"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-black text-foreground">{p.codigo}</span>
+                      <Pill className={corStatus[status]}>{rotuloStatus[status]}</Pill>
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm text-foreground">
+                      {p.cliente_nome}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {hora(p.criado_em)} · {p.tipo_entrega === 'delivery' ? 'Entrega' : 'Retirada'} ·{' '}
+                      {paymentLabels[p.pagamento as PaymentMethod]}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block truncate text-sm text-foreground">
-                    {p.cliente_nome}
+                  <span className="shrink-0 text-right">
+                    <span className="block font-extrabold tabular-nums text-foreground">
+                      {formatPrice(Number(p.total))}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'ml-auto h-5 w-5 text-muted-foreground transition-transform',
+                        expandido && 'rotate-180',
+                      )}
+                      aria-hidden="true"
+                    />
                   </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {hora(p.criado_em)} · {p.tipo_entrega === 'delivery' ? 'Entrega' : 'Retirada'} ·{' '}
-                    {paymentLabels[p.pagamento as PaymentMethod]}
-                  </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-extrabold tabular-nums text-foreground">
-                    {formatPrice(Number(p.total))}
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      'ml-auto h-5 w-5 text-muted-foreground transition-transform',
-                      expandido && 'rotate-180',
-                    )}
-                    aria-hidden="true"
-                  />
-                </span>
-              </button>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => imprimir(p as unknown as PedidoImpressao)}
+                  aria-label={`Imprimir comanda do pedido ${p.codigo}`}
+                  title="Imprimir comanda"
+                  className="press-sm tap-target flex shrink-0 items-center justify-center border-l border-border px-4 text-muted-foreground"
+                >
+                  <Printer className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
 
               {expandido && (
                 <div className="animate-slide-down border-t border-border p-4">
