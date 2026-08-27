@@ -93,10 +93,27 @@ const Checkout = () => {
       return;
     }
 
-    // A janela precisa ser aberta ANTES do await: navegadores só permitem
-    // window.open dentro do gesto do usuário, e abrir depois da resposta do
-    // servidor cairia no bloqueador de pop-up.
-    const aba = window.open('', '_blank', 'noopener,noreferrer');
+    /*
+     * A janela precisa ser aberta ANTES do await: navegadores só permitem
+     * `window.open` dentro do gesto do usuário, e abrir depois da resposta do
+     * servidor cai no bloqueador de pop-up.
+     *
+     * E não pode levar `noopener`: com essa opção a chamada devolve `null` por
+     * especificação, e sem o handle não há para onde mandar a conversa depois.
+     * Era isso que impedia o WhatsApp de abrir. O vínculo é cortado logo
+     * abaixo, com `opener = null`, antes de sair para um domínio de terceiro.
+     */
+    const aba = window.open('', '_blank');
+    if (aba) {
+      // Enquanto o pedido é registrado a aba fica em branco; sem isto parece
+      // que o navegador travou.
+      aba.document.write(
+        '<!doctype html><meta charset="utf-8"><title>Abrindo o WhatsApp</title>' +
+          '<body style="font:16px system-ui;display:grid;place-items:center;' +
+          'height:100vh;margin:0;color:#333">Registrando seu pedido...</body>',
+      );
+      aba.document.close();
+    }
 
     setEnviando(true);
     try {
