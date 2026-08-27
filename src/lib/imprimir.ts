@@ -17,6 +17,7 @@ export interface PedidoImpressao {
   taxa_entrega: number;
   taxa_servico: number;
   total: number;
+  distancia_km?: number | null;
   order_items: Array<{
     nome: string;
     quantidade: number;
@@ -26,15 +27,36 @@ export interface PedidoImpressao {
   }>;
 }
 
+/** Dados da loja que entram no cabeçalho da comanda. */
+export interface LojaImpressao {
+  nome: string;
+  whatsapp?: string | null;
+  endereco?: string | null;
+}
+
 /** 32 colunas é o que cabe numa bobina de 80mm com fonte monoespaçada de 12px. */
 const COLUNAS = 32;
 
 const linha = (c = '-') => c.repeat(COLUNAS);
 
-/** Nome à esquerda, valor à direita, preenchendo o meio com espaços. */
-const parYValor = (esquerda: string, direita: string) => {
-  const espaco = Math.max(1, COLUNAS - esquerda.length - direita.length);
-  return esquerda + ' '.repeat(espaco) + direita;
+/** Separador leve entre itens, para o olho não colar um no outro. */
+const separadorItem = () => '- '.repeat(COLUNAS / 2).trimEnd();
+
+const centralizar = (texto: string) => {
+  if (texto.length >= COLUNAS) return texto;
+  return ' '.repeat(Math.floor((COLUNAS - texto.length) / 2)) + texto;
+};
+
+/**
+ * Nome à esquerda, valor à direita, preenchendo o meio com espaços.
+ *
+ * Quando não cabem na mesma linha, o valor desce sozinho e alinhado à direita —
+ * melhor uma linha a mais do que um total grudado no rótulo.
+ */
+const parYValor = (esquerda: string, direita: string): string[] => {
+  const espaco = COLUNAS - esquerda.length - direita.length;
+  if (espaco < 1) return [esquerda, direita.padStart(COLUNAS)];
+  return [esquerda + ' '.repeat(espaco) + direita];
 };
 
 /**
@@ -62,7 +84,12 @@ const quebrar = (texto: string, largura = COLUNAS, recuo = '') => {
   return linhas;
 };
 
-/** Acentos fora: impressora térmica costuma trocá-los por lixo. */
+/**
+ * Acentos fora: impressora térmica costuma trocá-los por lixo.
+ *
+ * Diferente da comanda do WhatsApp, que é UTF-8 e transporta acento sem
+ * problema — aqui o destino é um equipamento com tabela de caracteres limitada.
+ */
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const escapar = (t: string) =>
@@ -72,27 +99,40 @@ const dataHora = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
 
 /** Monta o corpo da comanda em texto puro, largura fixa. */
-export const textoComanda = (p: PedidoImpressao, nomeLoja: string): string => {
+export const textoComanda = (p: PedidoImpressao, loja: LojaImpressao): string => {
   const out: string[] = [];
   const entrega = p.tipo_entrega === 'delivery';
+  const pecas = p.order_items.reduce((s, i) => s + i.quantidade, 0);
 
+  // ------------------------------------------------------------- cabeçalho
   out.push(linha('='));
-  out.push(semAcento(nomeLoja).toUpperCase().padStart((COLUNAS + nomeLoja.length) / 2));
-  out.push(`PEDIDO ${p.codigo}`.padStart((COLUNAS + p.codigo.length + 7) / 2));
+  out.push(centralizar(semAcento(loja.nome).toUpperCase()));
+  if (loja.whatsapp) out.push(centralizar(`WhatsApp: ${loja.whatsapp}`));
   out.push(linha('='));
-  out.push(dataHora(p.criado_em));
-  out.push(`Cliente: ${semAcento(p.cliente_nome)}`);
-  out.push(entrega ? '** ENTREGA **' : '** RETIRADA **');
+  out.push(centralizar(`PEDIDO ${p.codigo}`));
+  out.push(centralizar(dataHora(p.criado_em)));
+  out.push(linha('='));
+
+  // O tipo de entrega decide o que fazer com o pedido pronto, então vem antes
+  // de tudo e centralizado, difícil de passar batido.
+  out.push(centralizar(entrega ? '** ENTREGA **' : '** RETIRADA **'));
+  out.push(...quebrar(`Cliente: ${semAcento(p.cliente_nome)}`));
+
+  // ----------------------------------------------------------------- itens
+  out.push(linha());
+  out.push(`ITENS (${pecas})`);
   out.push(linha());
 
-  for (const item of p.order_items) {
+  p.order_items.forEach((item, i) => {
+    if (i > 0) out.push(separadorItem());
     out.push(...quebrar(`${item.quantidade}x ${semAcento(item.nome)}`));
-    out.push(parYValor('', formatPrice(Number(item.total))));
+    out.push(...parYValor('', formatPrice(Number(item.total))));
     for (const o of item.opcoes) {
       const qtd = o.quantidade > 1 ? `${o.quantidade}x ` : '';
       out.push(...quebrar(`  ${semAcento(o.grupo)}: ${qtd}${semAcento(o.opcao)}`, COLUNAS, '    '));
@@ -100,39 +140,55 @@ export const textoComanda = (p: PedidoImpressao, nomeLoja: string): string => {
     if (item.observacao) {
       out.push(...quebrar(`  OBS: ${semAcento(item.observacao)}`, COLUNAS, '       '));
     }
-    out.push('');
-  }
+  });
 
+  // ---------------------------------------------------------------- contas
   out.push(linha());
-  out.push(parYValor('Subtotal', formatPrice(Number(p.subtotal))));
+  out.push(...parYValor('Subtotal', formatPrice(Number(p.subtotal))));
   if (Number(p.desconto) > 0) {
-    out.push(parYValor(`Desconto ${p.cupom_codigo ?? ''}`.trim(), `-${formatPrice(Number(p.desconto))}`));
+    const rotulo = p.cupom_codigo ? `Desconto (${semAcento(p.cupom_codigo)})` : 'Desconto';
+    out.push(...parYValor(rotulo, `-${formatPrice(Number(p.desconto))}`));
   }
   if (Number(p.taxa_entrega) > 0) {
-    out.push(parYValor('Taxa de entrega', formatPrice(Number(p.taxa_entrega))));
+    const dist = p.distancia_km ? ` (${p.distancia_km} km)` : '';
+    out.push(...parYValor(`Taxa de entrega${dist}`, formatPrice(Number(p.taxa_entrega))));
   }
   if (Number(p.taxa_servico) > 0) {
-    out.push(parYValor('Taxa de servico', formatPrice(Number(p.taxa_servico))));
+    out.push(...parYValor('Taxa de servico', formatPrice(Number(p.taxa_servico))));
   }
-  out.push(linha());
-  out.push(parYValor('TOTAL', formatPrice(Number(p.total))));
-  out.push('');
+  out.push(linha('='));
+  out.push(...parYValor('TOTAL', formatPrice(Number(p.total))));
+  out.push(linha('='));
+
+  // ------------------------------------------------------------- pagamento
   out.push(`Pagamento: ${semAcento(paymentLabels[p.pagamento])}`);
   if (p.troco_para) {
     const troco = Number(p.troco_para) - Number(p.total);
-    out.push(`Troco para ${formatPrice(Number(p.troco_para))}`);
-    if (troco > 0) out.push(`LEVAR TROCO: ${formatPrice(troco)}`);
+    out.push(...parYValor('Troco para', formatPrice(Number(p.troco_para))));
+    // O troco é o que o entregador precisa separar antes de sair; fica marcado
+    // para não se perder no meio das outras linhas.
+    if (troco > 0) out.push(centralizar(`>> LEVAR ${formatPrice(troco)} <<`));
   }
   out.push(`Talheres: ${p.talheres ? 'SIM' : 'NAO'}`);
 
-  if (entrega && p.endereco) {
+  // -------------------------------------------------------------- endereço
+  if (entrega) {
     out.push(linha());
-    out.push('ENDERECO:');
-    out.push(...quebrar(semAcento(p.endereco)));
+    out.push('ENDERECO DE ENTREGA');
+    out.push(...quebrar(semAcento(p.endereco ?? '(nao informado)')));
     if (p.complemento) out.push(...quebrar(semAcento(p.complemento)));
+  } else if (loja.endereco) {
+    out.push(linha());
+    out.push('RETIRAR EM');
+    out.push(...quebrar(semAcento(loja.endereco)));
   }
 
+  // O código repetido no pé resolve a pilha de comandas na hora do movimento:
+  // dá para achar a certa sem desenrolar cada uma até o topo.
   out.push(linha('='));
+  out.push(centralizar(p.codigo));
+  out.push(linha('='));
+
   return out.join('\n');
 };
 
@@ -144,7 +200,7 @@ export const textoComanda = (p: PedidoImpressao, nomeLoja: string): string => {
  * qualquer tela poderia vazar para o papel. Uma página isolada com CSS próprio
  * imprime igual hoje e daqui a um ano.
  */
-export const imprimirComanda = (p: PedidoImpressao, nomeLoja: string) => {
+export const imprimirComanda = (p: PedidoImpressao, loja: LojaImpressao) => {
   const janela = window.open('', '_blank', 'width=380,height=650');
   if (!janela) {
     throw new Error('O navegador bloqueou a janela de impressão.');
@@ -173,7 +229,7 @@ export const imprimirComanda = (p: PedidoImpressao, nomeLoja: string) => {
   @media print { .acoes { display: none; } }
 </style></head>
 <body>
-<pre>${escapar(textoComanda(p, nomeLoja))}</pre>
+<pre>${escapar(textoComanda(p, loja))}</pre>
 <div class="acoes">
   <button onclick="window.print()">Imprimir</button>
   <button onclick="window.close()">Fechar</button>

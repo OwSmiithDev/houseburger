@@ -47,7 +47,11 @@ const Orders = () => {
 
   const imprimir = (p: PedidoImpressao) => {
     try {
-      imprimirComanda(p, config.data?.nome ?? 'House Burger');
+      imprimirComanda(p, {
+        nome: config.data?.nome ?? 'House Burger',
+        whatsapp: config.data?.whatsapp,
+        endereco: config.data?.endereco,
+      });
     } catch (e) {
       toast.error('Não foi possível abrir a impressão', {
         description: e instanceof Error ? e.message : undefined,
