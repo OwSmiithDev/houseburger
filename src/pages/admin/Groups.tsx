@@ -13,6 +13,7 @@ import {
 } from '@/lib/admin-api';
 import { CATALOG_KEY } from '@/data/catalog';
 import { formatPrice } from '@/lib/format';
+import { CampoNumero } from '@/components/base/CampoNumero';
 import { cn } from '@/lib/utils';
 
 const slugify = (s: string) =>
@@ -100,21 +101,19 @@ const Groups = () => {
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">
               <span className="mb-1 block font-bold text-foreground">Mínimo</span>
-              <input
-                type="number"
+              <CampoNumero
                 min={0}
                 value={rascunho.min_opcoes}
-                onChange={(e) => setRascunho({ ...rascunho, min_opcoes: Number(e.target.value) })}
+                onChange={(v) => setRascunho({ ...rascunho, min_opcoes: v })}
                 className={campo}
               />
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-bold text-foreground">Máximo</span>
-              <input
-                type="number"
+              <CampoNumero
                 min={1}
                 value={rascunho.max_opcoes}
-                onChange={(e) => setRascunho({ ...rascunho, max_opcoes: Number(e.target.value) })}
+                onChange={(v) => setRascunho({ ...rascunho, max_opcoes: v })}
                 className={campo}
               />
             </label>
@@ -158,6 +157,7 @@ const Groups = () => {
                     <label className="text-sm">
                       <span className="mb-1 block font-bold text-foreground">Mínimo</span>
                       <input
+                onFocus={(e) => e.currentTarget.select()}
                         type="number"
                         min={0}
                         defaultValue={g.min_opcoes}
@@ -170,6 +170,7 @@ const Groups = () => {
                     <label className="text-sm">
                       <span className="mb-1 block font-bold text-foreground">Máximo</span>
                       <input
+                onFocus={(e) => e.currentTarget.select()}
                         type="number"
                         min={1}
                         defaultValue={g.max_opcoes}
@@ -191,6 +192,7 @@ const Groups = () => {
                           className="h-11 min-w-0 flex-1 rounded-lg border-2 border-border bg-card px-2 text-sm text-foreground focus:border-ring focus:outline-none"
                         />
                         <input
+                onFocus={(e) => e.currentTarget.select()}
                           type="number"
                           step="0.01"
                           defaultValue={o.price_delta}
@@ -251,6 +253,7 @@ const Groups = () => {
                       className="h-11 min-w-0 flex-1 rounded-lg border-2 border-border bg-card px-2 text-sm text-foreground focus:border-ring focus:outline-none"
                     />
                     <input
+                onFocus={(e) => e.currentTarget.select()}
                       name="delta"
                       type="number"
                       step="0.01"

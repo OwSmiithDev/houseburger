@@ -96,14 +96,16 @@ const Coupons = () => {
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">
               <span className="mb-1 block font-bold text-foreground">Valor</span>
-              <input name="valor" type="number" step="0.01" min="0" defaultValue={10} className={campo} />
+              <input
+                onFocus={(e) => e.currentTarget.select()} name="valor" type="number" step="0.01" min="0" defaultValue={10} className={campo} />
               <span className="mt-1 block text-xs text-muted-foreground">
                 Em percentual, digite 10 para 10%
               </span>
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-bold text-foreground">Subtotal mínimo</span>
-              <input name="min" type="number" step="0.01" min="0" defaultValue={0} className={campo} />
+              <input
+                onFocus={(e) => e.currentTarget.select()} name="min" type="number" step="0.01" min="0" defaultValue={0} className={campo} />
             </label>
           </div>
           <button type="submit" className="press h-12 w-full rounded-xl bg-primary font-bold text-primary-foreground">

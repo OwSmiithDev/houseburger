@@ -8,6 +8,7 @@ import { SectionCard } from '@/components/base/primitives';
 import { lerConfiguracao, salvarConfiguracao } from '@/lib/admin-api';
 import { CATALOG_KEY } from '@/data/catalog';
 import { formatPrice } from '@/lib/format';
+import { CampoNumero } from '@/components/base/CampoNumero';
 import { cn } from '@/lib/utils';
 
 const campo =
@@ -84,10 +85,9 @@ const StoreSettings = () => {
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">
               <span className="mb-1 block font-bold text-foreground">Avaliação</span>
-              <input
-                type="number" step="0.1" min="0" max="5"
+              <CampoNumero step="0.1" min="0" max="5"
                 value={numero('avaliacao')}
-                onChange={(e) => set('avaliacao', Number(e.target.value))}
+                onChange={(v) => set('avaliacao', v)}
                 className={campo}
               />
             </label>
@@ -195,19 +195,17 @@ const StoreSettings = () => {
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">
               <span className="mb-1 block font-bold text-foreground">Tempo mín. (min)</span>
-              <input
-                type="number" min="0"
+              <CampoNumero min="0"
                 value={numero('tempo_min')}
-                onChange={(e) => set('tempo_min', Number(e.target.value))}
+                onChange={(v) => set('tempo_min', v)}
                 className={campo}
               />
             </label>
             <label className="block text-sm">
               <span className="mb-1 block font-bold text-foreground">Tempo máx. (min)</span>
-              <input
-                type="number" min="0"
+              <CampoNumero min="0"
                 value={numero('tempo_max')}
-                onChange={(e) => set('tempo_max', Number(e.target.value))}
+                onChange={(v) => set('tempo_max', v)}
                 className={campo}
               />
             </label>
@@ -215,19 +213,17 @@ const StoreSettings = () => {
               <span className="mb-1 block font-bold text-foreground">
                 {porKm ? 'Taxa de reserva' : 'Taxa de entrega'}
               </span>
-              <input
-                type="number" step="0.01" min="0"
+              <CampoNumero step="0.01" min="0"
                 value={numero('taxa_entrega')}
-                onChange={(e) => set('taxa_entrega', Number(e.target.value))}
+                onChange={(v) => set('taxa_entrega', v)}
                 className={campo}
               />
             </label>
             <label className="block text-sm">
               <span className="mb-1 block font-bold text-foreground">Pedido mínimo</span>
-              <input
-                type="number" step="0.01" min="0"
+              <CampoNumero step="0.01" min="0"
                 value={numero('pedido_minimo')}
-                onChange={(e) => set('pedido_minimo', Number(e.target.value))}
+                onChange={(v) => set('pedido_minimo', v)}
                 className={campo}
               />
             </label>
@@ -239,19 +235,17 @@ const StoreSettings = () => {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-sm">
                   <span className="mb-1 block font-bold text-foreground">Valor base</span>
-                  <input
-                    type="number" step="0.01" min="0"
+                  <CampoNumero step="0.01" min="0"
                     value={numero('taxa_base')}
-                    onChange={(e) => set('taxa_base', Number(e.target.value))}
+                    onChange={(v) => set('taxa_base', v)}
                     className={campo}
                   />
                 </label>
                 <label className="block text-sm">
                   <span className="mb-1 block font-bold text-foreground">Por km</span>
-                  <input
-                    type="number" step="0.01" min="0"
+                  <CampoNumero step="0.01" min="0"
                     value={numero('taxa_por_km')}
-                    onChange={(e) => set('taxa_por_km', Number(e.target.value))}
+                    onChange={(v) => set('taxa_por_km', v)}
                     className={campo}
                   />
                 </label>
@@ -261,15 +255,14 @@ const StoreSettings = () => {
                 <span className="mb-1 block font-bold text-foreground">
                   Raio maximo (km)
                 </span>
-                <input
-                  type="number" step="0.5" min="0"
+                <CampoNumero step="0.5" min="0"
                   value={
                     form.raio_maximo_km === null || form.raio_maximo_km === undefined
                       ? ''
                       : numero('raio_maximo_km')
                   }
-                  onChange={(e) =>
-                    set('raio_maximo_km', e.target.value === '' ? null : Number(e.target.value))
+                  onChange={(v) =>
+                    set('raio_maximo_km', v === '' ? null : v)
                   }
                   placeholder="Vazio = sem limite"
                   className={campo}
@@ -323,10 +316,9 @@ const StoreSettings = () => {
 
           <label className="block text-sm">
             <span className="mb-1 block font-bold text-foreground">Taxa de serviço (%)</span>
-            <input
-              type="number" step="0.1" min="0" max="100"
+            <CampoNumero step="0.1" min="0" max="100"
               value={(numero('taxa_servico') * 100).toFixed(1)}
-              onChange={(e) => set('taxa_servico', Number(e.target.value) / 100)}
+              onChange={(v) => set('taxa_servico', v / 100)}
               className={campo}
             />
             <span className="mt-1 block text-xs text-muted-foreground">
