@@ -13,8 +13,6 @@ import type { CustomerData } from '@/types/order';
 interface CheckoutApi {
   customer: CustomerData;
   setCustomer: (patch: Partial<CustomerData>) => void;
-  gorjeta: number;
-  setGorjeta: (valor: number) => void;
   reset: () => void;
 }
 
@@ -30,20 +28,14 @@ const CheckoutContext = createContext<CheckoutApi | null>(null);
 
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const [customer, setCustomerState] = useState<CustomerData>(inicial);
-  const [gorjeta, setGorjeta] = useState(0);
 
   const value = useMemo<CheckoutApi>(
     () => ({
       customer,
       setCustomer: (patch) => setCustomerState((anterior) => ({ ...anterior, ...patch })),
-      gorjeta,
-      setGorjeta,
-      reset: () => {
-        setCustomerState(inicial);
-        setGorjeta(0);
-      },
+      reset: () => setCustomerState(inicial),
     }),
-    [customer, gorjeta],
+    [customer],
   );
 
   return (

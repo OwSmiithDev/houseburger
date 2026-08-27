@@ -90,11 +90,7 @@ export const montarComanda = ({
   if (pedido.taxa_servico > 0) {
     m += `Taxa de servico: ${formatPrice(pedido.taxa_servico)}\n`;
   }
-  if (pedido.gorjeta > 0) {
-    // Sem pagamento no aplicativo, a gorjeta é uma intenção: precisa ficar
-    // explícito para quem entrega que o valor é cobrado junto, em mãos.
-    m += `Gorjeta ao entregador: ${formatPrice(pedido.gorjeta)} (a receber na entrega)\n`;
-  }
+
   m += `*TOTAL: ${formatPrice(pedido.total)}*\n`;
   m += `*Pagamento:* ${semAcento(paymentLabels[customer.paymentMethod])}\n`;
 

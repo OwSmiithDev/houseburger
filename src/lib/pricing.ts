@@ -185,7 +185,6 @@ export interface ResumoPedido {
   /** Detalhe do cálculo: distância, se falta localização, se está fora de área. */
   entrega: EntregaCalculada;
   taxaServico: number;
-  gorjeta: number;
   total: number;
   /** Quanto falta para atingir o pedido mínimo. Zero quando já atingiu. */
   faltaParaMinimo: number;
@@ -197,14 +196,12 @@ export const calcularResumo = ({
   linhas,
   deliveryType,
   couponCode,
-  gorjeta = 0,
   destino,
 }: {
   catalog: Catalog;
   linhas: LinhaResolvida[];
   deliveryType: DeliveryType;
   couponCode?: string | null;
-  gorjeta?: number;
   /** Ponto de entrega, para o cálculo por distância. */
   destino?: { lat: number; lng: number } | null;
 }): ResumoPedido => {
@@ -232,7 +229,7 @@ export const calcularResumo = ({
   const taxaServico = subtotal * serviceFeeRate;
   const total = Math.max(
     0,
-    subtotal - desconto + taxaEntrega + taxaServico + gorjeta,
+    subtotal - desconto + taxaEntrega + taxaServico,
   );
   const faltaParaMinimo = Math.max(0, minOrder - subtotal);
 
@@ -245,7 +242,6 @@ export const calcularResumo = ({
     entregaGratis,
     entrega,
     taxaServico,
-    gorjeta,
     total,
     faltaParaMinimo,
     atingiuMinimo: faltaParaMinimo === 0,

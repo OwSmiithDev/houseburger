@@ -87,7 +87,6 @@ export interface StoreSettings {
   timeMax: number;
   serviceFeeRate: number;
   minOrder: number;
-  tips: number[];
   open: boolean;
 
   /** Endereço da loja, mostrado a quem escolhe retirar. */

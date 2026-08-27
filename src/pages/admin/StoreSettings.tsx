@@ -334,26 +334,7 @@ const StoreSettings = () => {
             </span>
           </label>
 
-          <label className="block text-sm">
-            <span className="mb-1 block font-bold text-foreground">Sugestões de gorjeta</span>
-            <input
-              value={(form.gorjetas as number[] | null)?.join(', ') ?? ''}
-              onChange={(e) =>
-                set(
-                  'gorjetas',
-                  e.target.value
-                    .split(',')
-                    .map((v) => Number(v.trim()))
-                    .filter((v) => Number.isFinite(v) && v > 0),
-                )
-              }
-              placeholder="2, 3, 5"
-              className={campo}
-            />
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Valores em reais, separados por vírgula.
-            </span>
-          </label>
+
         </SectionCard>
 
         <button

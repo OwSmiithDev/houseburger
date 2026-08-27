@@ -30,11 +30,12 @@ export interface PedidoCriado {
   taxa_entrega: number;
   entrega_gratis: boolean;
   taxa_servico: number;
-  gorjeta: number;
   total: number;
   troco_para: number | null;
   /** Distância até o cliente, quando a taxa é por quilômetro. */
   distancia_km: number | null;
+  /** Identificador longo do pedido, usado no acompanhamento. */
+  token: string;
 }
 
 /**
@@ -43,22 +44,17 @@ export interface PedidoCriado {
  * Repare no que NÃO é enviado: nenhum preço, nenhum subtotal, nenhum total.
  * Só identificadores e quantidades. O banco recalcula tudo a partir das
  * tabelas, o que torna irrelevante qualquer adulteração do lado do cliente.
- *
- * A gorjeta é a única exceção, porque é escolha livre do cliente — e mesmo ela
- * entra limitada do outro lado.
  */
 export const criarPedido = async ({
   linhas,
   customer,
   cutlery,
   couponCode,
-  gorjeta,
 }: {
   linhas: LinhaResolvida[];
   customer: CustomerData;
   cutlery: boolean;
   couponCode: string | null;
-  gorjeta: number;
 }): Promise<PedidoCriado> => {
   const payload = {
     cliente_nome: customer.name.trim(),
@@ -71,7 +67,6 @@ export const criarPedido = async ({
     lng: customer.location?.lng ?? null,
     talheres: cutlery,
     cupom_codigo: couponCode ?? '',
-    gorjeta,
     itens: linhas.map(({ line, escolhas }) => ({
       // O id que o banco conhece é o uuid; o catálogo expõe o slug.
       product_slug: line.productId,

@@ -7,12 +7,11 @@
 -- ------------------------------------------------------------- configuração
 insert into store_settings (
   id, nome, whatsapp, chave_pix, banner_url, avaliacao, avaliacoes,
-  tempo_min, tempo_max, taxa_entrega, taxa_servico, pedido_minimo, gorjetas, aberta
+  tempo_min, tempo_max, taxa_entrega, taxa_servico, pedido_minimo, aberta
 ) values (
   1, 'House Burger', '5562999718912', '5562999718912', 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&h=400&fit=crop',
   4.8, '200+', 25, 40,
-  8.9, 0, 25,
-  '{2,3,5}', true
+  8.9, 0, 25, true
 )
 on conflict (id) do update set
   nome          = excluded.nome,
@@ -20,8 +19,7 @@ on conflict (id) do update set
   banner_url    = excluded.banner_url,
   taxa_entrega  = excluded.taxa_entrega,
   taxa_servico  = excluded.taxa_servico,
-  pedido_minimo = excluded.pedido_minimo,
-  gorjetas      = excluded.gorjetas;
+  pedido_minimo = excluded.pedido_minimo;
 
 -- ---------------------------------------------------------------- categorias
 insert into categories (slug, rotulo, icone, ordem) values ('promos', 'Promoções', 'Flame', 0)

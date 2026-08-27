@@ -38,9 +38,8 @@ const iconesPagamento = {
 const Checkout = () => {
   const navigate = useNavigate();
   const { catalog, linhas, lines, couponCode, cutlery, clearCart } = useCart();
-  const { customer, setCustomer, gorjeta, setGorjeta } = useCheckout();
+  const { customer, setCustomer } = useCheckout();
   const [erros, setErros] = useState<{ name?: string; address?: string }>({});
-  const [gorjetaOutra, setGorjetaOutra] = useState('');
   const [enviando, setEnviando] = useState(false);
   const { settings } = catalog;
 
@@ -50,7 +49,6 @@ const Checkout = () => {
     linhas,
     deliveryType: customer.deliveryType,
     couponCode,
-    gorjeta,
     destino: customer.location,
   });
 
@@ -99,7 +97,6 @@ const Checkout = () => {
         customer,
         cutlery,
         couponCode,
-        gorjeta,
       });
 
       const mensagem = montarComanda({ pedido, customer, cutlery, settings });
@@ -315,51 +312,6 @@ const Checkout = () => {
           <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </button>
 
-        {/* Gorjeta */}
-        {entrega && (
-          <SectionCard>
-            <h2 className="text-base font-bold text-foreground">Gorjeta ao entregador</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Opcional. O valor é entregue em mãos junto com o pagamento.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {settings.tips.map((valor) => (
-                <button
-                  key={valor}
-                  type="button"
-                  onClick={() => {
-                    haptic('light');
-                    setGorjeta(gorjeta === valor ? 0 : valor);
-                    setGorjetaOutra('');
-                  }}
-                  className={cn(
-                    'press h-11 min-w-20 rounded-xl border-2 px-4 text-sm font-bold transition-colors',
-                    gorjeta === valor
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-foreground',
-                  )}
-                >
-                  {formatPrice(valor)}
-                </button>
-              ))}
-              <input
-                type="text"
-                inputMode="decimal"
-                value={gorjetaOutra}
-                onChange={(e) => {
-                  const texto = e.target.value.replace(/[^0-9,.]/g, '');
-                  setGorjetaOutra(texto);
-                  const numero = Number(texto.replace(',', '.'));
-                  setGorjeta(Number.isFinite(numero) && numero > 0 ? numero : 0);
-                }}
-                placeholder="Outro"
-                aria-label="Outro valor de gorjeta"
-                className="h-11 w-24 rounded-xl border-2 border-border bg-card px-3 text-center text-sm font-bold text-foreground placeholder:font-normal placeholder:text-muted-foreground focus:border-ring focus:outline-none"
-              />
-            </div>
-          </SectionCard>
-        )}
-
         {/* Resumo com as contas abertas */}
         <SectionCard>
           <h2 className="mb-3 text-base font-bold text-foreground">Resumo</h2>
@@ -408,12 +360,6 @@ const Checkout = () => {
               </div>
             )}
 
-            {resumo.gorjeta > 0 && (
-              <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Gorjeta</dt>
-                <dd><Money value={resumo.gorjeta} className="text-foreground" /></dd>
-              </div>
-            )}
 
             <div className="flex justify-between gap-3 border-t border-border pt-2">
               <dt className="text-base font-bold text-foreground">Total</dt>

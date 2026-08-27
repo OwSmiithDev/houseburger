@@ -168,12 +168,6 @@ const Orders = () => {
                         <dd className="tabular-nums">{formatPrice(Number(p.taxa_entrega))}</dd>
                       </div>
                     )}
-                    {Number(p.gorjeta) > 0 && (
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Gorjeta</dt>
-                        <dd className="tabular-nums">{formatPrice(Number(p.gorjeta))}</dd>
-                      </div>
-                    )}
                     {p.troco_para && (
                       <div className="flex justify-between font-semibold">
                         <dt>Troco para</dt>
