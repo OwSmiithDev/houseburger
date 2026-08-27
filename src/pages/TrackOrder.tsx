@@ -8,9 +8,13 @@ import {
   CircleSlash,
   ClipboardCheck,
   MapPin,
+  MessageCircle,
   RefreshCw,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useCatalog } from '@/data/catalog';
+import { registrarConsulta } from '@/lib/historico';
+import { montarComanda, whatsappUrl, type DadosComanda } from '@/lib/whatsapp';
 import { formatPrice } from '@/lib/format';
 import { somStatus } from '@/lib/som';
 import { haptic } from '@/lib/haptics';
@@ -18,57 +22,6 @@ import { paymentLabels, type PaymentMethod } from '@/types/order';
 import { AppBar } from '@/components/base/AppBar';
 import { SectionCard } from '@/components/base/primitives';
 import { cn } from '@/lib/utils';
-
-const CHAVE_ULTIMO = 'houseburger:ultimo-pedido';
-
-interface PedidoAcompanhado {
-  codigo: string;
-  status: 'pendente' | 'preparando' | 'saiu' | 'entregue' | 'cancelado';
-  criado_em: string;
-  tipo_entrega: 'pickup' | 'delivery';
-  pagamento: PaymentMethod;
-  troco_para: number | null;
-  endereco: string | null;
-  complemento: string | null;
-  cliente_nome: string;
-  subtotal: number;
-  desconto: number;
-  taxa_entrega: number;
-  taxa_servico: number;
-  total: number;
-  itens: Array<{
-    nome: string;
-    quantidade: number;
-    total: number;
-    observacao: string;
-    opcoes: Array<{ grupo: string; opcao: string; quantidade: number }>;
-  }>;
-}
-
-/** Guarda o pedido no aparelho, para o cliente voltar depois de fechar o app. */
-export const lembrarPedido = (token: string) => {
-  try {
-    window.localStorage.setItem(CHAVE_ULTIMO, token);
-  } catch {
-    /* modo privado: sem persistência, mas o acompanhamento da sessão funciona */
-  }
-};
-
-export const esquecerPedido = () => {
-  try {
-    window.localStorage.removeItem(CHAVE_ULTIMO);
-  } catch {
-    /* nada a fazer */
-  }
-};
-
-export const pedidoLembrado = (): string | null => {
-  try {
-    return window.localStorage.getItem(CHAVE_ULTIMO);
-  } catch {
-    return null;
-  }
-};
 
 const etapas = [
   { id: 'pendente', rotulo: 'Recebido', desc: 'A loja vai confirmar', icone: ClipboardCheck },
@@ -88,6 +41,7 @@ const etapasPara = (tipo: 'pickup' | 'delivery') =>
 const TrackOrder = () => {
   const { token = '' } = useParams();
   const statusAnterior = useRef<string | null>(null);
+  const catalogo = useCatalog();
 
   const { data, isPending, isError, refetch, isFetching } = useQuery({
     queryKey: ['pedido', token],
@@ -119,8 +73,17 @@ const TrackOrder = () => {
     }
     statusAnterior.current = data.status;
 
-    if (data.status === 'entregue' || data.status === 'cancelado') esquecerPedido();
-  }, [data]);
+    // Mantém a lista local em dia. Um pedido entregue continua no histórico —
+    // some apenas a faixa de "em andamento" no topo do cardápio.
+    registrarConsulta(token, {
+      codigo: data.codigo,
+      criadoEm: data.criado_em,
+      total: Number(data.total),
+      tipoEntrega: data.tipo_entrega,
+      itens: data.itens.reduce((s, i) => s + i.quantidade, 0),
+      finalizado: data.status === 'entregue' || data.status === 'cancelado',
+    });
+  }, [data, token]);
 
   if (isPending) {
     return (
@@ -158,6 +121,48 @@ const TrackOrder = () => {
   const lista = etapasPara(data.tipo_entrega);
   const atual = lista.findIndex((e) => e.id === data.status);
   const cancelado = data.status === 'cancelado';
+
+  /*
+   * Reenvio da comanda pelo WhatsApp.
+   *
+   * O envio abre a conversa numa aba nova, e navegador nenhum garante isso:
+   * bloqueador de pop-up, aba fechada sem querer, WhatsApp que não estava
+   * instalado. Sem uma segunda porta, o pedido ficaria registrado no banco sem
+   * a cozinha saber. A mensagem é remontada a partir do que o servidor
+   * devolveu — não de nada guardado no aparelho.
+   */
+  const settings = catalogo.data?.settings;
+  const podeEnviar = Boolean(settings?.whatsapp) && !cancelado;
+
+  const enviarNoWhatsApp = () => {
+    if (!settings) return;
+    const comanda: DadosComanda = {
+      codigo: data.codigo,
+      criadoEm: data.criado_em,
+      clienteNome: data.cliente_nome,
+      entrega: data.tipo_entrega === 'delivery',
+      pagamento: data.pagamento,
+      trocoPara: data.troco_para,
+      talheres: Boolean(data.talheres),
+      endereco: data.endereco,
+      complemento: data.complemento,
+      local:
+        data.lat != null && data.lng != null
+          ? { lat: Number(data.lat), lng: Number(data.lng) }
+          : null,
+      cupom: data.cupom_codigo,
+      itens: data.itens,
+      subtotal: Number(data.subtotal),
+      desconto: Number(data.desconto),
+      taxaEntrega: Number(data.taxa_entrega),
+      taxaServico: Number(data.taxa_servico),
+      total: Number(data.total),
+    };
+    const url = whatsappUrl(settings.whatsapp, montarComanda(comanda, settings));
+    const aba = window.open(url, '_blank');
+    if (aba) aba.opener = null;
+    else window.location.href = url;
+  };
 
   return (
     <div className="min-h-dvh bg-background pb-8">
@@ -300,12 +305,31 @@ const TrackOrder = () => {
           </SectionCard>
         )}
 
-        <Link
-          to="/"
-          className="press-sm flex min-h-12 items-center justify-center rounded-xl border-2 border-border text-sm font-bold text-foreground"
-        >
-          Voltar ao cardápio
-        </Link>
+        {podeEnviar && (
+          <button
+            type="button"
+            onClick={enviarNoWhatsApp}
+            className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-success text-sm font-bold text-success-foreground"
+          >
+            <MessageCircle className="h-5 w-5" aria-hidden="true" />
+            Enviar comanda no WhatsApp
+          </button>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            to="/meus-pedidos"
+            className="press-sm flex min-h-12 items-center justify-center rounded-xl border-2 border-border text-sm font-bold text-foreground"
+          >
+            Meus pedidos
+          </Link>
+          <Link
+            to="/"
+            className="press-sm flex min-h-12 items-center justify-center rounded-xl border-2 border-border text-sm font-bold text-foreground"
+          >
+            Cardápio
+          </Link>
+        </div>
       </div>
     </div>
   );

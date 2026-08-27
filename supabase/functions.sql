@@ -301,6 +301,12 @@ begin
     'taxa_entrega', ped.taxa_entrega,
     'taxa_servico', ped.taxa_servico,
     'total', ped.total,
+    -- O que falta para remontar a comanda do WhatsApp a partir daqui, quando
+    -- o navegador engole a janela no momento do envio.
+    'talheres', ped.talheres,
+    'cupom_codigo', ped.cupom_codigo,
+    'lat', ped.lat,
+    'lng', ped.lng,
     'itens', itens
   );
 end;
