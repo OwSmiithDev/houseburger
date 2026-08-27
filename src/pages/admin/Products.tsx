@@ -202,7 +202,7 @@ const Products = () => {
             <p className="mb-3 text-xs text-muted-foreground">
               Quais grupos de opções este produto usa.
             </p>
-            <div className="space-y-2">
+            <div className="grid gap-2 md:grid-cols-2">
               {(grupos.data ?? []).map((g) => {
                 const marcado = gruposSelecionados.includes(g.id);
                 return (

@@ -112,7 +112,7 @@ const Coupons = () => {
         </form>
       )}
 
-      <div className="space-y-2">
+      <div className="grid gap-2 md:grid-cols-2">
         {(cupons.data ?? []).map((c) => (
           <div key={c.id} className={cn('surface p-4', !c.ativo && 'opacity-50')}>
             <div className="flex items-start gap-3">

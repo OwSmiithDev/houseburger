@@ -128,7 +128,7 @@ const Groups = () => {
         </form>
       )}
 
-      <div className="space-y-2">
+      <div className="grid gap-2 md:grid-cols-2 md:items-start">
         {(grupos.data ?? []).map((g) => {
           const expandido = aberto === g.id;
           return (

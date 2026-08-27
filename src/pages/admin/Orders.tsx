@@ -66,7 +66,12 @@ const Orders = () => {
   const atualizar = useMutation({
     mutationFn: ({ id, status }: { id: string; status: StatusPedido }) =>
       mudarStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'pedidos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'pedidos'] });
+      // A contagem em vermelho também: aceitar um pedido tira ele da fila, e o
+      // badge não pode ficar mentindo até a próxima varredura de 15s.
+      qc.invalidateQueries({ queryKey: ['admin', 'pendentes'] });
+    },
     onError: (e: Error) => toast.error('Não foi possível atualizar', { description: e.message }),
   });
 
@@ -98,7 +103,7 @@ const Orders = () => {
         <p className="py-10 text-center text-muted-foreground">Nenhum pedido aqui.</p>
       )}
 
-      <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2 md:items-start">
         {lista.map((p) => {
           const expandido = aberto === p.id;
           const status = p.status as StatusPedido;

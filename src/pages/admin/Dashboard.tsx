@@ -91,7 +91,7 @@ const Dashboard = () => {
         </div>
       </SectionCard>
 
-      <div className="mb-3 grid grid-cols-3 gap-2">
+      <div className="mb-3 grid grid-cols-3 gap-2 md:grid-cols-6">
         {[
           { rotulo: 'Pedidos hoje', valor: String(doDia.length) },
           { rotulo: 'Pendentes', valor: String(pendentes) },
@@ -109,6 +109,7 @@ const Dashboard = () => {
       <div className="surface divide-y divide-border">
         {[
           { to: '/admin/pedidos', label: 'Pedidos', desc: 'Acompanhar e mudar status' },
+          { to: '/admin/relatorios', label: 'Relatórios', desc: 'Vendas, faturamento e mais vendidos' },
           { to: '/admin/produtos', label: 'Produtos', desc: 'Cardápio, preços e disponibilidade' },
           { to: '/admin/grupos', label: 'Grupos de opções', desc: 'Personalização dos itens' },
           { to: '/admin/cupons', label: 'Cupons', desc: 'Descontos e regras' },
