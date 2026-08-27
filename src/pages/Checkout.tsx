@@ -21,9 +21,9 @@ import { Money, Pill, SectionCard } from '@/components/base/primitives';
 import { useCart } from '@/store/cart';
 import { useCheckout } from '@/store/checkout';
 import { calcularResumo } from '@/lib/pricing';
-import { mapsUrl, montarComanda, whatsappUrl } from '@/lib/whatsapp';
+import { comandaDoPedido, mapsUrl, montarComanda, whatsappUrl } from '@/lib/whatsapp';
 import { criarPedido } from '@/lib/orders';
-import { lembrarPedido } from '@/pages/TrackOrder';
+import { lembrarPedido } from '@/lib/historico';
 import { prepararSom } from '@/lib/som';
 import { formatPrice } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
@@ -126,15 +126,26 @@ const Checkout = () => {
         couponCode,
       });
 
-      const mensagem = montarComanda({ pedido, customer, cutlery, settings });
+      const mensagem = montarComanda(
+        comandaDoPedido({ pedido, customer, cutlery, couponCode }),
+        settings,
+      );
       const url = whatsappUrl(settings.whatsapp, mensagem);
 
-      if (aba) aba.location.href = url;
-      else window.open(url, '_blank', 'noopener,noreferrer');
+      const abriu = Boolean(aba) && !aba!.closed;
+      if (abriu) {
+        // Corta o vínculo antes de entregar a aba a um domínio de terceiro.
+        aba!.opener = null;
+        aba!.location.replace(url);
+      } else {
+        aba?.close();
+      }
 
       haptic('success');
       toast.success(`Pedido ${pedido.codigo} registrado!`, {
-        description: 'Confirme a conversa no WhatsApp.',
+        description: abriu
+          ? 'Confirme a conversa no WhatsApp.'
+          : 'Use o botão para enviar a comanda no WhatsApp.',
       });
       // Marca antes de esvaziar: a partir daqui a sacola vazia é esperada e
       // não deve acionar o desvio para o cardápio.
@@ -144,7 +155,14 @@ const Checkout = () => {
       // Este clique é o gesto que libera o áudio no navegador; sem ele o
       // primeiro alerta de mudança de status ficaria mudo.
       prepararSom();
-      lembrarPedido(pedido.token);
+      lembrarPedido({
+        token: pedido.token,
+        codigo: pedido.codigo,
+        criadoEm: new Date().toISOString(),
+        total: pedido.total,
+        tipoEntrega: customer.deliveryType,
+        itens: pedido.itens.reduce((s, i) => s + i.quantidade, 0),
+      });
       navigate(`/pedido/${pedido.token}`, { replace: true });
     } catch (erro) {
       aba?.close();
