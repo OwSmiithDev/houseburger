@@ -21,7 +21,7 @@
 insert into categories (slug, rotulo, icone, ordem, ativa) values
   ('demo-pratos',    'Pratos',    'UtensilsCrossed', 0, true),
   ('demo-bebidas',   'Bebidas',   'CupSoda',         1, true),
-  ('demo-sobremesas','Sobremesas','IceCream',        2, true)
+  ('demo-sobremesas','Sobremesas','IceCreamCone',    2, true)
 on conflict (slug) do update set
   rotulo = excluded.rotulo,
   icone  = excluded.icone,
@@ -31,13 +31,12 @@ on conflict (slug) do update set
 -- ------------------------------------------------------------ grupos de opções
 -- Obrigatório e de escolha única: o botão de adicionar fica travado até o
 -- cliente escolher.
-insert into option_groups (slug, nome, descricao, min_opcoes, max_opcoes, ordem) values
-  ('demo-ponto',      'Ponto do preparo', 'Escolha 1',    1, 1, 0),
-  ('demo-adicionais', 'Adicionais',       'Até 3 itens',  0, 3, 1),
-  ('demo-tamanho',    'Tamanho',          'Escolha 1',    1, 1, 0)
+insert into option_groups (slug, nome, min_opcoes, max_opcoes, ordem) values
+  ('demo-ponto',      'Ponto do preparo', 1, 1, 0),
+  ('demo-adicionais', 'Adicionais',       0, 3, 1),
+  ('demo-tamanho',    'Tamanho',          1, 1, 0)
 on conflict (slug) do update set
   nome       = excluded.nome,
-  descricao  = excluded.descricao,
   min_opcoes = excluded.min_opcoes,
   max_opcoes = excluded.max_opcoes,
   ordem      = excluded.ordem;
@@ -61,22 +60,21 @@ on conflict (group_id, slug) do update set
   ordem       = excluded.ordem;
 
 -- -------------------------------------------------------------------- produtos
-insert into products (slug, nome, descricao, preco, preco_de, category_id, destaque, ordem)
-select v.slug, v.nome, v.descricao, v.preco, v.preco_de, c.id, v.destaque, v.ordem
+insert into products (slug, nome, descricao, preco, category_id, destaque, ordem)
+select v.slug, v.nome, v.descricao, v.preco, c.id, v.destaque, v.ordem
   from (values
-    ('demo-prato-1', 'Prato do dia',      'Descreva aqui o que vai no prato.',           32.90, null::numeric, 'demo-pratos',     true,  0),
-    ('demo-prato-2', 'Prato executivo',   'Acompanha guarnição e salada.',               28.50, 34.90,         'demo-pratos',     true,  1),
-    ('demo-prato-3', 'Opção vegetariana', 'Sem ingredientes de origem animal.',          26.00, null,          'demo-pratos',     false, 2),
-    ('demo-bebida-1','Refrigerante',      'Lata ou garrafa.',                             6.90, null,          'demo-bebidas',    false, 0),
-    ('demo-bebida-2','Suco natural',      'Feito na hora.',                               9.90, null,          'demo-bebidas',    false, 1),
-    ('demo-doce-1',  'Sobremesa da casa', 'Pergunte o sabor do dia.',                    14.90, null,          'demo-sobremesas', false, 0)
-  ) as v(slug, nome, descricao, preco, preco_de, categoria, destaque, ordem)
+    ('demo-prato-1', 'Prato do dia',      'Descreva aqui o que vai no prato.',  32.90, 'demo-pratos',     true,  0),
+    ('demo-prato-2', 'Prato executivo',   'Acompanha guarnição e salada.',      28.50, 'demo-pratos',     true,  1),
+    ('demo-prato-3', 'Opção vegetariana', 'Sem ingredientes de origem animal.', 26.00, 'demo-pratos',     false, 2),
+    ('demo-bebida-1','Refrigerante',      'Lata ou garrafa.',                    6.90, 'demo-bebidas',    false, 0),
+    ('demo-bebida-2','Suco natural',      'Feito na hora.',                      9.90, 'demo-bebidas',    false, 1),
+    ('demo-doce-1',  'Sobremesa da casa', 'Pergunte o sabor do dia.',           14.90, 'demo-sobremesas', false, 0)
+  ) as v(slug, nome, descricao, preco, categoria, destaque, ordem)
   join categories c on c.slug = v.categoria
 on conflict (slug) do update set
   nome        = excluded.nome,
   descricao   = excluded.descricao,
   preco       = excluded.preco,
-  preco_de    = excluded.preco_de,
   category_id = excluded.category_id,
   destaque    = excluded.destaque,
   ordem       = excluded.ordem;
@@ -96,10 +94,12 @@ select p.id, g.id, v.ordem
 on conflict (product_id, group_id) do update set ordem = excluded.ordem;
 
 -- ---------------------------------------------------------------------- cupom
-insert into coupons (codigo, tipo, valor, minimo, ativo) values
-  ('BEMVINDO', 'percentual', 10, 30, true)
+-- 'percent' guarda fração: 0.10 = 10% de desconto.
+insert into coupons (codigo, descricao, tipo, valor, min_subtotal, ativo) values
+  ('BEMVINDO', '10% na primeira compra', 'percent', 0.10, 30, true)
 on conflict (codigo) do update set
-  tipo   = excluded.tipo,
-  valor  = excluded.valor,
-  minimo = excluded.minimo,
-  ativo  = excluded.ativo;
+  descricao    = excluded.descricao,
+  tipo         = excluded.tipo,
+  valor        = excluded.valor,
+  min_subtotal = excluded.min_subtotal,
+  ativo        = excluded.ativo;

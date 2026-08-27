@@ -100,8 +100,7 @@ create table if not exists products (
   nome         text not null,
   descricao    text not null default '',
   preco        numeric(10,2) not null check (preco >= 0),
-  preco_de     numeric(10,2) check (preco_de is null or preco_de >= preco),
-  imagem_url   text not null default '',
+  image_url    text not null default '',
   category_id  uuid references categories(id) on delete set null,
   destaque     boolean not null default false,
   esgotado     boolean not null default false,
@@ -116,7 +115,6 @@ create table if not exists option_groups (
   id           uuid primary key default gen_random_uuid(),
   slug         text unique not null,
   nome         text not null,
-  descricao    text not null default '',
   min_opcoes   int not null default 0 check (min_opcoes >= 0),
   max_opcoes   int not null default 1 check (max_opcoes >= 1),
   ordem        int not null default 0
@@ -145,12 +143,19 @@ create table if not exists product_groups (
 create table if not exists coupons (
   id            uuid primary key default gen_random_uuid(),
   codigo        text unique not null,
-  tipo          text not null check (tipo in ('percentual','fixo','entrega_gratis')),
+  descricao     text not null default '',
+  -- 'percent' guarda fração (0.10 = 10%); 'fixed' guarda reais; 'shipping'
+  -- zera a taxa de entrega e ignora o valor.
+  tipo          text not null check (tipo in ('percent','fixed','shipping')),
   valor         numeric(10,2) not null default 0 check (valor >= 0),
-  minimo        numeric(10,2) not null default 0 check (minimo >= 0),
+  min_subtotal  numeric(10,2) not null default 0 check (min_subtotal >= 0),
   ativo         boolean not null default true,
+  -- Nulo = sem validade. Depois desta data `create_order` recusa o cupom.
   expira_em     timestamptz
 );
+
+-- Coluna acrescentada depois da primeira versão.
+alter table coupons add column if not exists expira_em timestamptz;
 
 -- -------------------------------------------------------------------- pedidos
 create table if not exists orders (
@@ -477,9 +482,13 @@ begin
   end if;
 
   -- O cupom é buscado pelo código; o desconto que o cliente calculou é ignorado.
+  -- A validade também é conferida aqui: a tela do cliente esconde o cupom
+  -- vencido por conveniência, mas quem recusa é o banco.
   if coalesce(payload->>'cupom_codigo','') <> '' then
     select * into cupom from coupons
-      where upper(codigo) = upper(payload->>'cupom_codigo') and ativo;
+      where upper(codigo) = upper(payload->>'cupom_codigo')
+        and ativo
+        and (expira_em is null or expira_em > now());
     if found and v_subtotal >= cupom.min_subtotal then
       if cupom.tipo = 'percent' then
         v_desconto := round(v_subtotal * cupom.valor, 2);

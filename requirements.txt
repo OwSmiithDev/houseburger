@@ -14,3 +14,7 @@
 # rode os scripts de teste apontando para essa URL.
 
 playwright==1.60.0
+
+# Parser oficial do Postgres (libpg_query). Usado por tests/conferir_schema.py
+# para comparar o instalar.sql com o banco que está no ar.
+pglast==8.4
