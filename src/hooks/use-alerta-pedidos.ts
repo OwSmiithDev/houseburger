@@ -41,6 +41,21 @@ const INTERVALO_ALARME = 15_000;
  */
 export const useAlertaPedidos = () => {
   const qc = useQueryClient();
+
+  // Só o nome, e sem varredura: é para o título da notificação do sistema.
+  const { data: nomeDaLoja } = useQuery({
+    queryKey: ['admin', 'nome-da-loja'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('store_settings')
+        .select('nome')
+        .eq('id', 1)
+        .single();
+      if (error) throw new Error(error.message);
+      return (data?.nome as string) ?? '';
+    },
+    staleTime: 10 * 60_000,
+  });
   const [somLigado, setSomLigado] = useState(() => {
     try {
       return window.localStorage.getItem(CHAVE_SOM) !== 'off';
@@ -91,7 +106,9 @@ export const useAlertaPedidos = () => {
       // sempre" — a permissão é solicitada por botão em AdminShell.
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
-          new Notification('Pedido novo no House Burger', {
+          // O nome sai da configuração da loja: o mesmo sistema é instalado
+          // para empresas diferentes, e estava fixo como "House Burger".
+          new Notification(nomeDaLoja ? `Pedido novo · ${nomeDaLoja}` : 'Pedido novo', {
             body: quantos === 1 ? '1 pedido aguardando' : `${quantos} pedidos aguardando`,
             tag: 'pedido-novo',
           });
@@ -100,7 +117,7 @@ export const useAlertaPedidos = () => {
         }
       }
     },
-    [somLigado],
+    [somLigado, nomeDaLoja],
   );
 
   // Dispara quando a contagem SOBE. Ignora a primeira leitura, senão abrir o
