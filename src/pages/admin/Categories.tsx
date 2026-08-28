@@ -339,13 +339,16 @@ const Categories = () => {
                 </span>
               </button>
 
-              <div className="flex shrink-0 flex-col">
+              {/* Lado a lado, e não empilhadas: empilhadas cada seta ficava com
+                  24px de altura, abaixo do mínimo de 44px que o resto do
+                  aplicativo respeita. */}
+              <div className="flex shrink-0">
                 <button
                   type="button"
                   onClick={() => mover(i, -1)}
                   disabled={i === 0}
                   aria-label={`Subir ${c.rotulo}`}
-                  className="press-sm flex h-6 w-8 items-center justify-center text-muted-foreground disabled:opacity-30"
+                  className="press-sm flex h-11 w-9 items-center justify-center text-muted-foreground disabled:opacity-30"
                 >
                   <ChevronUp className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -354,7 +357,7 @@ const Categories = () => {
                   onClick={() => mover(i, 1)}
                   disabled={i === lista.length - 1}
                   aria-label={`Descer ${c.rotulo}`}
-                  className="press-sm flex h-6 w-8 items-center justify-center text-muted-foreground disabled:opacity-30"
+                  className="press-sm flex h-11 w-9 items-center justify-center text-muted-foreground disabled:opacity-30"
                 >
                   <ChevronDown className="h-4 w-4" aria-hidden="true" />
                 </button>

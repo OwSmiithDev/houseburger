@@ -108,6 +108,18 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+Um deles roda sem navegador e vale a cada mudança no SQL:
+
+```sh
+python tests/conferir_schema.py
+```
+
+Ele compara as colunas declaradas em `instalar.sql` com as que o banco devolve.
+Existe porque o instalador já esteve sintaticamente perfeito e ainda assim
+inutilizável: declarava `products.imagem_url` onde o banco tem `image_url`, e
+`coupons.minimo` onde `create_order` procura `min_subtotal`. Validar sintaxe
+não pega esse tipo de erro; comparar nomes pega.
+
 ## Estrutura
 
 ```
@@ -128,9 +140,9 @@ src/
 │   ├── Address.tsx             /endereco      mapa (sob demanda)
 │   ├── TrackOrder.tsx          /pedido/:token acompanhamento (sob demanda)
 │   ├── MyOrders.tsx            /meus-pedidos  histórico local (sob demanda)
-│   └── admin/                  /admin/*       painel da loja
+│   └── admin/                  /admin/*       painel da loja (8 telas)
 ├── components/
-│   ├── base/                   BottomBar, AppBar, Stepper, primitives
+│   ├── base/                   BottomBar, AppBar, Switch, CampoNumero, primitives
 │   ├── store/                  StoreHero, CategoryChips, ProductRow, carrossel
 │   ├── product/                OptionGroupField
 │   ├── admin/                  AdminShell, CampoImagem, SeletorLocal
@@ -152,6 +164,9 @@ src/
 ├── hooks/use-alerta-pedidos.ts contagem de pendentes e alerta de pedido novo
 ├── data/catalog.ts             busca o cardápio do banco
 └── types/order.ts              tipos do domínio
+
+tests/
+└── conferir_schema.py          compara o instalar.sql com o banco no ar
 ```
 
 As rotas usam `React.lazy`. É o que mantém o Leaflet (~46 KB comprimidos) e o
@@ -166,9 +181,10 @@ Tudo se ajusta pelo `/admin`, sem publicar código:
 |---|---|
 | **Loja** | Nome, sigla do pedido, logo, banner, endereço e ponto no mapa, WhatsApp, chave Pix, taxas, pedido mínimo |
 | **Produtos** | Cardápio, preços, fotos, categoria, destaque, esgotado e quais grupos de opções cada item usa |
+| **Categorias** | Seções do cardápio: nome, ícone, ordem e ativa. É por aqui que o sistema deixa de ser de hamburgueria |
 | **Opções** | Grupos de personalização, mínimo, máximo e o acréscimo de cada escolha |
-| **Cupons** | Percentual, valor fixo ou entrega grátis, com subtotal mínimo |
-| **Pedidos** | Fila da cozinha, mudança de status e impressão da comanda |
+| **Cupons** | Percentual, valor fixo ou entrega grátis, com subtotal mínimo e data de validade |
+| **Pedidos** | Fila da cozinha, busca em todo o histórico, mudança de status e impressão da comanda |
 | **Relatórios** | Faturamento, ticket médio, cancelamentos e itens mais vendidos por período |
 
 No código só ficam as duas variáveis de ambiente em `.env`.
@@ -202,6 +218,18 @@ Duas consequências que valem entender:
 - **No modo por distância o ponto no mapa vira obrigatório** para entrega. Sem
   ele não há o que medir, e cair na taxa fixa premiaria quem não marcasse. O
   checkout avisa e leva ao mapa; o banco recusa o pedido de qualquer forma.
+
+### Categorias, e o mesmo sistema em outro nicho
+
+As seções do cardápio são dados, não código: nome, ícone, ordem e ativa saem de
+`/admin` → **Categorias**. É o que permite instalar a mesma aplicação para uma
+pizzaria sem tocar em nada — junto com a sigla do pedido, que também vem da
+configuração da loja em vez de estar fixa como `HB-`.
+
+Excluir uma categoria com produtos é recusado. A chave estrangeira é
+`on delete set null`, então o banco deixaria passar e os produtos ficariam
+órfãos, sumindo da navegação sem aviso. Para tirar do ar sem apagar, existe o
+interruptor de ativa.
 
 ### Fila da cozinha e alertas
 
