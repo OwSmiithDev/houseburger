@@ -275,6 +275,31 @@ export const listarPedidos = async (limite = 100) => {
   return data ?? [];
 };
 
+/**
+ * Busca no histórico inteiro, e não só nos pedidos já carregados.
+ *
+ * `listarPedidos` traz os mais recentes; procurar dentro deles deixaria um
+ * pedido de mês passado invisível, sem nenhum sinal de que existe. Quem filtra
+ * é o banco, pela função `buscar_pedidos`.
+ */
+export const buscarPedidos = async (f: {
+  texto?: string;
+  inicio?: string | null;
+  fim?: string | null;
+  status?: StatusPedido | null;
+  limite?: number;
+}) => {
+  const { data, error } = await supabase.rpc('buscar_pedidos', {
+    p_texto: f.texto?.trim() || null,
+    p_inicio: f.inicio || null,
+    p_fim: f.fim || null,
+    p_status: f.status || null,
+    p_limite: f.limite ?? 100,
+  });
+  naoDeuCerto(error);
+  return (data ?? []) as Awaited<ReturnType<typeof listarPedidos>>;
+};
+
 export const mudarStatus = async (id: string, status: StatusPedido) => {
   const { error } = await supabase.from('orders').update({ status }).eq('id', id);
   naoDeuCerto(error);

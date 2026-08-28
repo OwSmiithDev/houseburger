@@ -400,3 +400,115 @@ $$;
 -- O visitante só pode chamar esta função; escrever em orders continua vedado.
 revoke all on function create_order(jsonb) from public;
 grant execute on function create_order(jsonb) to anon, authenticated;
+
+
+-- ----------------------------------------------------------------------------
+-- 5. Busca de pedidos
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------
+-- Busca de pedidos no painel
+-- ----------------------------------------------------------------------------
+
+/*
+ * Procura em todo o histórico, por código, nome do cliente, status e período.
+ *
+ * A tela carrega só os pedidos mais recentes, então filtrar no navegador
+ * deixaria um pedido de mês passado invisível — e sem nenhum sinal de que ele
+ * existe. A busca precisa acontecer onde estão todos os pedidos.
+ *
+ * `security definer` restrito a autenticado, no mesmo padrão das funções de
+ * relatório: o visitante não lê a tabela `orders` de jeito nenhum.
+ */
+create or replace function buscar_pedidos(
+  p_texto  text        default null,
+  p_inicio timestamptz default null,
+  p_fim    timestamptz default null,
+  p_status text        default null,
+  p_limite int         default 100
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_texto text;
+begin
+  if auth.role() <> 'authenticated' then
+    raise exception 'Acesso restrito';
+  end if;
+
+  -- `%` e `_` são curingas no LIKE; escapados, uma busca por "50%" procura
+  -- "50%" em vez de qualquer coisa começada em 50.
+  v_texto := nullif(trim(coalesce(p_texto, '')), '');
+  if v_texto is not null then
+    v_texto := '%' || replace(replace(v_texto, '%', '\%'), '_', '\_') || '%';
+  end if;
+
+  return coalesce((
+    select jsonb_agg(p order by p->>'criado_em' desc)
+      from (
+        select jsonb_build_object(
+                 'id', o.id,
+                 'codigo', o.codigo,
+                 'cliente_nome', o.cliente_nome,
+                 'tipo_entrega', o.tipo_entrega,
+                 'pagamento', o.pagamento,
+                 'troco_para', o.troco_para,
+                 'endereco', o.endereco,
+                 'complemento', o.complemento,
+                 'lat', o.lat,
+                 'lng', o.lng,
+                 'talheres', o.talheres,
+                 'observacao', o.observacao,
+                 'cupom_codigo', o.cupom_codigo,
+                 'subtotal', o.subtotal,
+                 'desconto', o.desconto,
+                 'taxa_entrega', o.taxa_entrega,
+                 'taxa_servico', o.taxa_servico,
+                 'total', o.total,
+                 'status', o.status,
+                 'criado_em', o.criado_em,
+                 'order_items', coalesce((
+                   select jsonb_agg(jsonb_build_object(
+                            'id', i.id,
+                            'nome', i.nome,
+                            'quantidade', i.quantidade,
+                            'preco_unit', i.preco_unit,
+                            'total', i.total,
+                            'observacao', i.observacao,
+                            'opcoes', i.opcoes
+                          ) order by i.ordem)
+                     from order_items i where i.order_id = o.id
+                 ), '[]'::jsonb)
+               ) as p
+          from orders o
+         where (v_texto is null
+                or o.codigo ilike v_texto
+                or o.cliente_nome ilike v_texto)
+           and (p_inicio is null or o.criado_em >= p_inicio)
+           and (p_fim    is null or o.criado_em <  p_fim)
+           and (p_status is null or o.status = p_status)
+         order by o.criado_em desc
+         limit greatest(1, least(coalesce(p_limite, 100), 300))
+      ) as achados
+  ), '[]'::jsonb);
+end;
+$$;
+
+revoke all on function buscar_pedidos(text, timestamptz, timestamptz, text, int) from public;
+grant execute on function buscar_pedidos(text, timestamptz, timestamptz, text, int) to authenticated;
+
+/*
+ * Índice para a busca por trecho do nome ou do código.
+ *
+ * Um índice comum não serviria: `ilike '%maria%'` começa com curinga, e um
+ * B-tree só ajuda quando o começo do texto é conhecido. Trigramas indexam
+ * pedaços de três letras, e é o que faz esse tipo de busca não varrer a
+ * tabela inteira a cada tecla digitada.
+ */
+create extension if not exists pg_trgm;
+
+create index if not exists orders_busca_idx
+  on orders using gin (cliente_nome gin_trgm_ops, codigo gin_trgm_ops);

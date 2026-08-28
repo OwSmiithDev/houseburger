@@ -76,6 +76,11 @@ export default {
           foreground: "hsl(var(--economia-foreground))",
           border: "hsl(var(--economia-border))",
         },
+        rota: {
+          DEFAULT: "hsl(var(--rota))",
+          foreground: "hsl(var(--rota-foreground))",
+          border: "hsl(var(--rota-border))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
