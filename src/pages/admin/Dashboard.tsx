@@ -4,22 +4,52 @@ import { ChevronRight, Power } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { SectionCard } from '@/components/base/primitives';
-import { lerConfiguracao, listarPedidos, salvarConfiguracao } from '@/lib/admin-api';
+import { lerConfiguracao, salvarConfiguracao } from '@/lib/admin-api';
+import { supabase } from '@/lib/supabase';
+import { useAlerta } from '@/hooks/use-alerta-pedidos';
 import { CATALOG_KEY } from '@/data/catalog';
 import { formatPrice } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-const hoje = () => {
+/** Meia-noite local de hoje, deslocada em `dias`. */
+const meiaNoite = (dias = 0) => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + dias);
   return d;
 };
+
+interface Resumo {
+  pedidos: number;
+  faturamento: number;
+}
+
+/**
+ * Um dia fechado, pelo próprio banco.
+ *
+ * Antes os números saíam dos pedidos já carregados na tela, o que servia para
+ * "hoje" e não servia para "ontem": a listagem traz os mais recentes, e um dia
+ * movimentado empurra o dia anterior para fora dela. `relatorio_resumo` já
+ * recebe intervalo e já ignora cancelados no faturamento.
+ */
+const useResumoDoDia = (dias: number) =>
+  useQuery({
+    queryKey: ['admin', 'resumo-dia', dias],
+    queryFn: async (): Promise<Resumo> => {
+      const { data, error } = await supabase.rpc('relatorio_resumo', {
+        p_inicio: meiaNoite(dias).toISOString(),
+        p_fim: meiaNoite(dias + 1).toISOString(),
+      });
+      if (error) throw new Error(error.message);
+      return data as Resumo;
+    },
+    staleTime: 60_000,
+  });
 
 const Dashboard = () => {
   const qc = useQueryClient();
 
   const config = useQuery({ queryKey: ['admin', 'config'], queryFn: lerConfiguracao });
-  const pedidos = useQuery({ queryKey: ['admin', 'pedidos'], queryFn: () => listarPedidos(100) });
 
   const alternarLoja = useMutation({
     mutationFn: (aberta: boolean) => salvarConfiguracao({ aberta }),
@@ -37,11 +67,11 @@ const Dashboard = () => {
     onError: (e: Error) => toast.error('Não foi possível alterar', { description: e.message }),
   });
 
-  const doDia = (pedidos.data ?? []).filter(
-    (p) => new Date(p.criado_em) >= hoje() && p.status !== 'cancelado',
-  );
-  const faturamento = doDia.reduce((s, p) => s + Number(p.total), 0);
-  const pendentes = doDia.filter((p) => p.status === 'pendente').length;
+  const hoje = useResumoDoDia(0);
+  const ontem = useResumoDoDia(-1);
+  // Pendente não é do dia: um pedido de ontem que ninguém aceitou continua
+  // esperando, e some do painel se a conta olhar só para hoje.
+  const { pendentes } = useAlerta();
 
   const aberta = config.data?.aberta ?? false;
 
@@ -91,16 +121,36 @@ const Dashboard = () => {
         </div>
       </SectionCard>
 
-      <div className="mb-3 grid grid-cols-3 gap-2 md:grid-cols-6">
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {[
-          { rotulo: 'Pedidos hoje', valor: String(doDia.length) },
-          { rotulo: 'Pendentes', valor: String(pendentes) },
-          { rotulo: 'Faturamento', valor: formatPrice(faturamento) },
-        ].map(({ rotulo, valor }) => (
-          <SectionCard key={rotulo} className="p-3 text-center">
-            <p className="text-xs text-muted-foreground">{rotulo}</p>
-            <p className="mt-1 truncate text-base font-extrabold text-foreground">
-              {pedidos.isPending ? '...' : valor}
+          { rotulo: 'Pedidos hoje', valor: String(hoje.data?.pedidos ?? 0), pronto: !hoje.isPending },
+          { rotulo: 'Pedidos ontem', valor: String(ontem.data?.pedidos ?? 0), pronto: !ontem.isPending },
+          { rotulo: 'Pendentes', valor: String(pendentes), pronto: true, destaque: pendentes > 0 },
+          {
+            rotulo: 'Faturamento hoje',
+            valor: formatPrice(Number(hoje.data?.faturamento ?? 0)),
+            pronto: !hoje.isPending,
+          },
+          {
+            rotulo: 'Faturamento ontem',
+            valor: formatPrice(Number(ontem.data?.faturamento ?? 0)),
+            pronto: !ontem.isPending,
+          },
+        ].map(({ rotulo, valor, pronto, destaque }) => (
+          <SectionCard
+            key={rotulo}
+            className={cn('p-3 text-center', destaque && 'bg-aviso')}
+          >
+            <p className={cn('text-xs', destaque ? 'text-aviso-foreground' : 'text-muted-foreground')}>
+              {rotulo}
+            </p>
+            <p
+              className={cn(
+                'mt-1 truncate text-base font-extrabold',
+                destaque ? 'text-aviso-foreground' : 'text-foreground',
+              )}
+            >
+              {pronto ? valor : '...'}
             </p>
           </SectionCard>
         ))}
