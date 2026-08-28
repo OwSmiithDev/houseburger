@@ -171,7 +171,11 @@ tests/
 
 As rotas usam `React.lazy`. É o que mantém o Leaflet (~46 KB comprimidos) e o
 `supabase-js` completo (~53 KB) fora do carregamento inicial: quem só quer pedir
-um lanche baixa 117 KB.
+um lanche baixa 112 KB.
+
+As dependências são 16. Eram 52 até a limpeza: o projeto nasceu de um template
+com 46 componentes do shadcn, e ao removê-los as bibliotecas ficaram
+declaradas sem ninguém importá-las.
 
 ## Configuração
 
