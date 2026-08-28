@@ -1,4 +1,14 @@
-"""Confere se o `instalar.sql` descreve o mesmo banco que está no ar.
+"""Confere se os arquivos SQL descrevem o mesmo banco que está no ar.
+
+Duas verificações:
+
+1. As colunas declaradas em `instalar.sql` batem com as que o banco devolve.
+2. As funções repetidas em `instalar.sql` e `atualizar.sql` são idênticas.
+
+A segunda existe porque quatro funções vivem duplicadas nos dois arquivos: a
+migração precisa recriá-las e o instalador precisa trazê-las prontas. Nada
+impede que uma seja corrigida e a outra não, e a diferença só apareceria numa
+instalação nova, meses depois.
 
 Existe por causa de um defeito real: o instalador declarava `products.imagem_url`
 enquanto o banco (e o aplicativo) usavam `image_url`, e `coupons.minimo` onde a
@@ -14,9 +24,10 @@ Uso:
     Lê VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY do .env da raiz.
     A chave publicável basta: só faz leitura, e o que o RLS esconder é pulado.
 
-Saída: 0 se tudo bate, 1 se alguma tabela diverge.
+Saída: 0 se tudo bate, 1 se alguma tabela ou função diverge.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -27,10 +38,12 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 INSTALADOR = RAIZ / "supabase" / "instalar.sql"
+MIGRACAO = RAIZ / "supabase" / "atualizar.sql"
 
-# Colunas que existem no arquivo mas ainda não foram aplicadas ao banco em
-# operação. Some daqui assim que o `atualizar.sql` for executado lá.
-PENDENTES = {"coupons": {"expira_em"}}
+# Colunas que já estão no arquivo mas ainda não foram aplicadas ao banco em
+# operação — o intervalo entre publicar o código e rodar o `atualizar.sql`.
+# Vazio quando os dois estão em dia, que é o estado normal.
+PENDENTES: dict[str, set[str]] = {}
 
 
 def ler_env() -> tuple[str, str]:
@@ -89,6 +102,35 @@ def colunas_no_arquivo() -> dict[str, set[str]]:
     return tabelas
 
 
+def funcoes(arquivo: Path) -> dict[str, str]:
+    """Nome da função -> resumo do corpo, com espaços normalizados."""
+    sql = arquivo.read_text(encoding="utf-8")
+    achadas = {}
+    for m in re.finditer(r"(create or replace function (\w+)\(.*?\$\$;)", sql, re.S):
+        corpo = re.sub(r"\s+", " ", m.group(1)).strip()
+        achadas[m.group(2)] = hashlib.sha1(corpo.encode()).hexdigest()[:12]
+    return achadas
+
+
+def conferir_funcoes() -> int:
+    """Toda função da migração precisa ser igual à do instalador."""
+    do_instalador = funcoes(INSTALADOR)
+    da_migracao = funcoes(MIGRACAO)
+    problemas = 0
+
+    for nome, resumo in sorted(da_migracao.items()):
+        if nome not in do_instalador:
+            print(f"[ERRO]   {nome}: está na migração e falta no instalador")
+            problemas += 1
+        elif do_instalador[nome] != resumo:
+            print(f"[ERRO]   {nome}: as duas cópias divergiram")
+            problemas += 1
+        else:
+            print(f"[ok]     {nome}: idêntica nos dois arquivos")
+
+    return problemas
+
+
 def main() -> int:
     base, chave = ler_env()
     problemas = 0
@@ -116,6 +158,12 @@ def main() -> int:
         print(f"\n{problemas} tabela(s) divergindo — o instalador não reproduz este banco.")
         return 1
     print("\nO instalador descreve o mesmo banco que está no ar.")
+
+    print("\nFunções duplicadas entre o instalador e a migração:")
+    if conferir_funcoes():
+        print("\nAs cópias divergiram: corrija antes de instalar em outro lugar.")
+        return 1
+    print("\nAs duas cópias de cada função são iguais.")
     return 0
 
 

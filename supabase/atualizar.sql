@@ -419,6 +419,12 @@ grant execute on function create_order(jsonb) to anon, authenticated;
  *
  * `security definer` restrito a autenticado, no mesmo padrão das funções de
  * relatório: o visitante não lê a tabela `orders` de jeito nenhum.
+ *
+ * ATENÇÃO ao intervalo: `p_inicio` é INCLUSIVO e `p_fim` é EXCLUSIVO
+ * (`criado_em >= p_inicio and criado_em < p_fim`). Para o dia 28 inteiro,
+ * passe 28T00:00 e 29T00:00 — passar 28 nas duas pontas devolve vazio, porque
+ * nenhum instante é ao mesmo tempo maior-ou-igual e menor que a mesma
+ * meia-noite. Foi exatamente esse o defeito que a tela teve.
  */
 create or replace function buscar_pedidos(
   p_texto  text        default null,

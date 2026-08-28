@@ -114,11 +114,17 @@ Um deles roda sem navegador e vale a cada mudança no SQL:
 python tests/conferir_schema.py
 ```
 
-Ele compara as colunas declaradas em `instalar.sql` com as que o banco devolve.
-Existe porque o instalador já esteve sintaticamente perfeito e ainda assim
-inutilizável: declarava `products.imagem_url` onde o banco tem `image_url`, e
-`coupons.minimo` onde `create_order` procura `min_subtotal`. Validar sintaxe
-não pega esse tipo de erro; comparar nomes pega.
+Ele faz duas conferências:
+
+1. **As colunas** declaradas em `instalar.sql` batem com as que o banco devolve.
+   Existe porque o instalador já esteve sintaticamente perfeito e ainda assim
+   inutilizável: declarava `products.imagem_url` onde o banco tem `image_url`, e
+   `coupons.minimo` onde `create_order` procura `min_subtotal`. Validar sintaxe
+   não pega esse tipo de erro; comparar nomes pega.
+2. **As funções repetidas** em `instalar.sql` e `atualizar.sql` são idênticas.
+   Quatro delas vivem duplicadas — a migração precisa recriá-las e o instalador
+   precisa trazê-las prontas — e nada impede corrigir uma e esquecer a outra. A
+   diferença só apareceria numa instalação nova, meses depois.
 
 ## Estrutura
 
@@ -271,6 +277,23 @@ e passa a 30 depois disso.
 
 > A notificação do sistema exige HTTPS e permissão do navegador. Em `localhost`
 > funciona; pelo IP da rede, não. O som e o número em vermelho cobrem esse caso.
+
+### Busca de pedidos
+
+O painel carrega a fila recente, mas achar um pedido de semana passada precisa
+de outra coisa: a busca vai ao banco, por `buscar_pedidos`, e cobre todo o
+histórico. Procura por código, por nome do cliente e por intervalo de datas de
+criação.
+
+O intervalo é inclusivo nas duas pontas para quem escolhe — "de 28 até 28" traz
+o dia 28 inteiro. Na função o fim é exclusivo (`criado_em < p_fim`), e a tela
+converte somando um dia; passar a mesma data nas duas pontas sem essa conversão
+devolve vazio, porque nenhum instante é ao mesmo tempo maior-ou-igual e menor
+que a mesma meia-noite.
+
+Um índice de trigramas (`pg_trgm`) sustenta a busca por trecho. Índice comum
+não serviria: `ilike '%maria%'` começa com curinga, e B-tree só ajuda quando o
+começo do texto é conhecido.
 
 ### Impressão da comanda
 
