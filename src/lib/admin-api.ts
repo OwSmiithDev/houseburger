@@ -31,7 +31,9 @@ const COLUNAS_PRODUTO = [
 
 const COLUNAS_GRUPO = ['slug', 'nome', 'min_opcoes', 'max_opcoes', 'ordem'] as const;
 const COLUNAS_OPCAO = ['group_id', 'slug', 'nome', 'price_delta', 'esgotado', 'ordem'] as const;
-const COLUNAS_CUPOM = ['codigo', 'descricao', 'tipo', 'valor', 'min_subtotal', 'ativo'] as const;
+const COLUNAS_CUPOM = [
+  'codigo', 'descricao', 'tipo', 'valor', 'min_subtotal', 'ativo', 'expira_em',
+] as const;
 const COLUNAS_CATEGORIA = ['slug', 'rotulo', 'icone', 'ordem', 'ativa'] as const;
 
 // ------------------------------------------------------------------ produtos
@@ -219,6 +221,8 @@ export const salvarCupom = async (c: {
   valor: number;
   min_subtotal: number;
   ativo: boolean;
+  /** ISO 8601, ou nulo para cupom sem validade. */
+  expira_em?: string | null;
 }) => {
   const campos = apenas(c, COLUNAS_CUPOM);
   const { error } = c.id

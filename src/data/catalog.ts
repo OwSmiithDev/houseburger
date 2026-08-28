@@ -123,13 +123,19 @@ const buscarCatalogo = async (): Promise<Catalog> => {
       groups: gruposPorProduto.get(p.id),
     }));
 
-  const couponList: Coupon[] = (cupons.data ?? []).map((c) => ({
-    code: c.codigo,
-    description: c.descricao,
-    type: c.tipo,
-    value: Number(c.valor),
-    minSubtotal: Number(c.min_subtotal),
-  }));
+  const agora = Date.now();
+  const couponList: Coupon[] = (cupons.data ?? [])
+    // Cupom vencido some da lista por conveniência — o cliente não perde tempo
+    // digitando um código que não vale mais. Quem recusa de fato é o banco, em
+    // `create_order`: esconder aqui não é defesa.
+    .filter((c) => !c.expira_em || new Date(c.expira_em).getTime() > agora)
+    .map((c) => ({
+      code: c.codigo,
+      description: c.descricao,
+      type: c.tipo,
+      value: Number(c.valor),
+      minSubtotal: Number(c.min_subtotal),
+    }));
 
   return { settings, categories, products, coupons: couponList };
 };
