@@ -49,6 +49,31 @@ const corCartao: Record<StatusPedido, string> = {
   cancelado: 'border-l-4 border-l-border bg-muted/50 opacity-70',
 };
 
+/**
+ * Início do dia escolhido, no fuso de quem está olhando a tela.
+ *
+ * O `<input type="date">` devolve `AAAA-MM-DD` sem fuso. Interpretar isso como
+ * UTC jogaria o corte três horas para trás no Brasil, e pedidos da madrugada
+ * cairiam no dia anterior.
+ */
+const inicioDoDia = (data: string) => new Date(`${data}T00:00:00`).toISOString();
+
+/**
+ * Fim do dia escolhido, como instante exclusivo: a meia-noite do dia seguinte.
+ *
+ * `buscar_pedidos` compara com `<`, então passar a meia-noite do próprio dia
+ * final deixaria de fora tudo que foi pedido depois dela — e um filtro de
+ * "hoje até hoje" viraria uma janela vazia, sem nenhum pedido.
+ *
+ * `setDate` em vez de somar 24h em milissegundos: assim vira mês e ano
+ * sozinho, e não se perde numa eventual mudança de horário de verão.
+ */
+const fimDoDia = (data: string) => {
+  const d = new Date(`${data}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString();
+};
+
 const hora = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', {
     day: '2-digit',
@@ -108,16 +133,16 @@ const Orders = () => {
    * Busca no banco. Só roda quando há filtro, e sem varredura periódica: o
    * resultado é uma consulta pontual, não a fila que a cozinha acompanha.
    *
-   * `fim` recebe o dia seguinte porque a função compara com `<`; passar o
-   * próprio dia deixaria de fora tudo que foi pedido depois da meia-noite dele.
+   * O intervalo é pela data de criação do pedido, e as duas pontas são
+   * inclusivas para quem escolhe: "de 28 até 28" traz o dia 28 inteiro.
    */
   const busca = useQuery({
     queryKey: ['admin', 'pedidos', 'busca', texto.trim(), de, ate, filtro],
     queryFn: () =>
       buscarPedidos({
         texto: texto.trim(),
-        inicio: de ? new Date(`${de}T00:00:00`).toISOString() : null,
-        fim: ate ? new Date(`${ate}T00:00:00`).toISOString() : null,
+        inicio: de ? inicioDoDia(de) : null,
+        fim: ate ? fimDoDia(ate) : null,
         status: filtro === 'todos' ? null : filtro,
         limite: 200,
       }),
